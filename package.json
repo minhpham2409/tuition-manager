@@ -1,0 +1,12 @@
+{
+  "name": "tuition-manager",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter api run start:dev",
+    "dev:web": "pnpm --filter web run dev",
+    "db:migrate": "pnpm --filter api run prisma:migrate",
+    "db:seed": "pnpm --filter api run prisma:seed",
+    "db:studio": "pnpm --filter api run prisma:studio"
+  }
+}

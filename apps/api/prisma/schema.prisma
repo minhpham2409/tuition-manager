@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+  PARTIAL
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  classes      Class[]
+  bankAccounts BankAccount[]
+}
+
+model Class {
+  id             String    @id @default(uuid())
+  name           String
+  tuitionFee     Int       // Giữ lại cho backward compat
+  pricePerLesson Int?      // Giá mỗi buổi dạy
+  schedule       String?   // VD: "2,5" (Thứ 2, Thứ 5)
+  scheduleTime   String?   // VD: "18:00"
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students       Student[]
+  lessons        Lesson[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Lesson {
+  id          String       @id @default(uuid())
+  classId     String
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  date        DateTime
+  taught      Boolean      @default(false)
+  note        String?
+  attendances Attendance[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([classId, date])
+}
+
+model Attendance {
+  id        String  @id @default(uuid())
+  lessonId  String
+  lesson    Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  present   Boolean @default(true)
+  note      String?
+
+  @@unique([lessonId, studentId])
+}
+
+model Student {
+  id          String       @id @default(uuid())
+  name        String
+  parentName  String
+  parentPhone String?
+  classId     String
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  invoices    Invoice[]
+  attendances Attendance[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Invoice {
+  id           String        @id @default(uuid())
+  studentId    String
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  month        Int
+  year         Int
+  amount       Int
+  lessonsTotal Int?          // Tổng buổi dạy trong tháng
+  lessonsAttended Int?       // Số buổi HS tham gia
+  status       InvoiceStatus @default(UNPAID)
+  note         String?
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+
+  @@unique([studentId, month, year])
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  gateway         String
+  amount          Int
+  content         String
+  referenceCode   String?
+  transactionDate DateTime
+  invoiceId       String?
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id])
+  matched         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model BankAccount {
+  id          String  @id @default(uuid())
+  bankId      String
+  accountNo   String
+  accountName String
+  isDefault   Boolean @default(true)
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
