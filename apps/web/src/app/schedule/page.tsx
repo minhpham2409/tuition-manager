@@ -262,21 +262,35 @@ function SchedulePage() {
       <main className="main-content">
         <div className="page-header">
           <h1 className="page-title">Lịch dạy <span>{currentClass?.name || ''}</span></h1>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {taughtCount > 0 && (
-              <button className="btn btn-ghost" onClick={async () => {
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost" onClick={async () => {
+              try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API}/lessons/attendance-template?classId=${classId}&month=${month}&year=${year}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) { const e = await res.json().catch(() => ({})); return alert('Lỗi: ' + (e.message || 'Không tải được')); }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `mau-diem-danh-T${month}-${year}-${currentClass?.name}.xlsx`; a.click();
+                URL.revokeObjectURL(url);
+              } catch (e: any) { alert('Lỗi: ' + e.message); }
+            }}>📄 File mẫu</button>
+            <button className="btn btn-ghost" onClick={async () => {
+              try {
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${API}/lessons/export-attendance?classId=${classId}&month=${month}&year=${year}`, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
-                if (!res.ok) return alert('Không xuất được');
+                if (!res.ok) { const e = await res.json().catch(() => ({})); return alert('Lỗi: ' + (e.message || 'Không xuất được')); }
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url;
                 a.download = `diem-danh-T${month}-${year}-${currentClass?.name}.xlsx`; a.click();
                 URL.revokeObjectURL(url);
-              }}>⬇️ Điểm danh</button>
-            )}
+              } catch (e: any) { alert('Lỗi: ' + e.message); }
+            }}>⬇️ Điểm danh</button>
             {taughtCount > 0 && <button className="btn btn-secondary" onClick={openReport}>Báo cáo</button>}
             <button className="btn btn-primary" onClick={generateLessons}>Tạo từ lịch</button>
           </div>

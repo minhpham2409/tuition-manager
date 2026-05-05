@@ -60,5 +60,18 @@ export class LessonsController {
     res.setHeader('Content-Disposition', `attachment; filename="diem-danh-T${month}-${year}.xlsx"`);
     res.send(buffer);
   }
+
+  @Get('attendance-template')
+  async attendanceTemplate(
+    @Query('classId') classId: string,
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.svc.generateAttendanceTemplate(classId, parseInt(month), parseInt(year));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="mau-diem-danh-T${month}-${year}.xlsx"`);
+    res.send(buffer);
+  }
 }
 

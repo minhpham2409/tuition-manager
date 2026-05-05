@@ -20,26 +20,35 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1 className="auth-title">📖 PhamMinh Tool</h1>
-        <p className="auth-subtitle">Tạo tài khoản giáo viên</p>
-        {error && <div className="auth-error">{error}</div>}
+    <div className="login-page">
+      <div className="login-card">
+        <h1 className="login-title">📖 PhamMinh Tool</h1>
+        <p className="login-subtitle">Tạo tài khoản giáo viên</p>
+        {error && (
+          <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--danger-bg, #fee2e2)', color: 'var(--danger, #dc2626)', fontSize: '.82rem', fontWeight: 500, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
-          <div className="form-group"><label className="form-label">Họ tên</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="Cô Nguyễn Thị A" required />
+          <div className="form-group">
+            <label className="form-label">Họ tên</label>
+            <input className="form-input" style={{ width: '100%' }} value={name} onChange={e => setName(e.target.value)} placeholder="Cô Nguyễn Thị A" required />
           </div>
-          <div className="form-group"><label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input className="form-input" style={{ width: '100%' }} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" required />
           </div>
-          <div className="form-group"><label className="form-label">Mật khẩu</label>
-            <input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Tối thiểu 6 ký tự" required minLength={6} />
+          <div className="form-group">
+            <label className="form-label">Mật khẩu</label>
+            <input className="form-input" style={{ width: '100%' }} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Tối thiểu 6 ký tự" required minLength={6} />
           </div>
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 18px' }} disabled={loading}>
             {loading ? 'Đang tạo...' : 'Đăng ký →'}
           </button>
         </form>
-        <p className="auth-link">Đã có tài khoản? <a href="/login">Đăng nhập</a></p>
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: '.82rem', color: 'var(--text-3)' }}>
+          Đã có tài khoản? <a href="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Đăng nhập</a>
+        </p>
       </div>
     </div>
   );
