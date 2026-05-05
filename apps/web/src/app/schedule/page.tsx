@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { api, formatMoney } from '@/lib/api';
@@ -8,7 +8,11 @@ import Sidebar from '@/components/Sidebar';
 
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-export default function SchedulePage() {
+export default function SchedulePageWrapper() {
+  return <Suspense fallback={<div className="loading"><div className="spinner" /></div>}><SchedulePage /></Suspense>;
+}
+
+function SchedulePage() {
   const { user, loading: al } = useAuth();
   const router = useRouter();
   const params = useSearchParams();

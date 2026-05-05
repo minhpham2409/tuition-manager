@@ -1,11 +1,15 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { api, formatMoney } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 
-export default function InvoicesPage() {
+export default function InvoicesPageWrapper() {
+  return <Suspense fallback={<div className="loading"><div className="spinner" /></div>}><InvoicesPage /></Suspense>;
+}
+
+function InvoicesPage() {
   const { user, loading: al } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
