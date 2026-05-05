@@ -39,7 +39,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Row */}
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <div className="stats-grid">
           <div className="stat-card purple">
             <div className="stat-label">Lớp học</div>
             <div className="stat-value">{stats?.classes || 0}</div>
@@ -68,9 +68,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Two column layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 14, marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 14 }}>
           {/* Revenue chart */}
-          <div className="card">
+          <div className="card" style={{ flex: '1 1 300px' }}>
             <div className="card-title">Doanh thu 6 tháng</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 160, paddingTop: 12 }}>
               {stats?.revenueByMonth?.map((r: any, i: number) => {
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Lesson summary */}
-          <div className="card">
+          <div className="card" style={{ flex: '1 1 200px' }}>
             <div className="card-title">Buổi dạy tháng này</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '16px 0' }}>
               <div style={{ position: 'relative', width: 100, height: 100 }}>
@@ -133,8 +133,9 @@ export default function DashboardPage() {
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-title">Chi tiết theo lớp</div>
           {stats?.classBreakdown?.length > 0 ? (
-            <table className="data-table">
-              <thead>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
                 <tr><th>Lớp</th><th>Sĩ số</th><th>Giá/buổi</th><th>Tổng phí</th><th>Đã thu</th><th>Chưa thu</th><th>Tiến độ</th></tr>
               </thead>
               <tbody>
@@ -171,6 +172,7 @@ export default function DashboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
           ) : (
             <div className="empty-state"><div className="empty-state-text">Chưa có dữ liệu</div></div>
           )}
@@ -180,8 +182,9 @@ export default function DashboardPage() {
         {stats?.unpaidStudents?.length > 0 && (
           <div className="card">
             <div className="card-title">Học sinh chưa đóng phí</div>
-            <table className="data-table">
-              <thead><tr><th>Học sinh</th><th>Lớp</th><th>Số tiền</th><th>Thao tác</th></tr></thead>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead><tr><th>Học sinh</th><th>Lớp</th><th>Số tiền</th><th>Thao tác</th></tr></thead>
               <tbody>
                 {stats.unpaidStudents.map((inv: any) => (
                   <tr key={inv.id}>
@@ -195,6 +198,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </main>

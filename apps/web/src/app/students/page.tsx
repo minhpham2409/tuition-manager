@@ -102,28 +102,34 @@ export default function StudentsPage() {
           /* Table view when filtering by class */
           <div className="card">
             {filtered.length > 0 ? (
-              <table className="data-table">
-                <thead><tr><th>Họ tên</th><th>Phụ huynh</th><th>SĐT</th><th>Lớp</th><th style={{ width: 120 }}>Thao tác</th></tr></thead>
-                <tbody>
-                  {filtered.map(s => (
-                    <tr key={s.id}>
-                      <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
-                      <td>{s.parentName}</td>
-                      <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
-                      <td>
-                        <select className="form-select" value={s.classId} onChange={e => changeClass(s.id, e.target.value)}
-                          style={{ padding: '4px 8px', fontSize: '.78rem' }}>
-                          {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </td>
-                      <td style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-sm btn-ghost" onClick={() => openEdit(s)}>Sửa</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => remove(s.id, s.name)}>Xóa</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead><tr><th>Họ tên</th><th>Phụ huynh</th><th>SĐT</th><th>Lớp</th><th style={{ width: 120 }}>Thao tác</th></tr></thead>
+                  <tbody>
+                    {filtered.map(s => (
+                      <tr key={s.id}>
+                        <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
+                        <td>{s.parentName}</td>
+                        <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
+                        <td>
+                          <select className="form-select" value={s.classId} onChange={e => changeClass(s.id, e.target.value)}
+                            style={{ padding: '4px 8px', fontSize: '.78rem' }}>
+                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ display: 'flex', gap: 4 }}>
+                          <button className="btn btn-sm btn-ghost" onClick={() => openEdit(s)}>Sửa</button>
+                          <button className="btn btn-sm btn-ghost" onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/portal/${s.id}`);
+                            showToast('Đã copy link portal');
+                          }}>🔗 Portal</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => remove(s.id, s.name)}>Xóa</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <div className="empty-state">
                 <div className="empty-state-text">Lớp chưa có học sinh</div>
@@ -143,27 +149,29 @@ export default function StudentsPage() {
                   </div>
                   <button className="btn btn-sm btn-secondary" onClick={() => openNew(classStudents[0]?.classId)}>Thêm vào lớp</button>
                 </div>
-                <table className="data-table">
-                  <thead><tr><th>Họ tên</th><th>Phụ huynh</th><th>SĐT</th><th style={{ width: 150 }}>Thao tác</th></tr></thead>
-                  <tbody>
-                    {classStudents.map(s => (
-                      <tr key={s.id}>
-                        <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
-                        <td>{s.parentName}</td>
-                        <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
-                        <td style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-sm btn-ghost" onClick={() => openEdit(s)}>Sửa</button>
-                          <select className="form-select" onChange={e => { if (e.target.value) changeClass(s.id, e.target.value); e.target.value = ''; }}
-                            style={{ padding: '3px 6px', fontSize: '.72rem', width: 'auto' }}>
-                            <option value="">Chuyển lớp</option>
-                            {classes.filter(c => c.id !== s.classId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                          <button className="btn btn-sm btn-danger" onClick={() => remove(s.id, s.name)}>Xóa</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead><tr><th>Họ tên</th><th>Phụ huynh</th><th>SĐT</th><th style={{ width: 150 }}>Thao tác</th></tr></thead>
+                    <tbody>
+                      {classStudents.map(s => (
+                        <tr key={s.id}>
+                          <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
+                          <td>{s.parentName}</td>
+                          <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
+                          <td style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-sm btn-ghost" onClick={() => openEdit(s)}>Sửa</button>
+                            <select className="form-select" onChange={e => { if (e.target.value) changeClass(s.id, e.target.value); e.target.value = ''; }}
+                              style={{ padding: '3px 6px', fontSize: '.72rem', width: 'auto' }}>
+                              <option value="">Chuyển lớp</option>
+                              {classes.filter(c => c.id !== s.classId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                            <button className="btn btn-sm btn-danger" onClick={() => remove(s.id, s.name)}>Xóa</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ))}
             {grouped.size === 0 && (

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { api, formatMoney } from '@/lib/api';
+import * as XLSX from 'xlsx';
 import Sidebar from '@/components/Sidebar';
 
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -183,6 +184,34 @@ export default function SchedulePage() {
       const zaloPhone = student.parentPhone.replace(/^0/, '84');
       window.open(`https://zalo.me/${zaloPhone}`, '_blank');
     }
+  };
+
+  const exportExcel = () => {
+    if (!report) return;
+    const wsData = [
+      ['BÁO CÁO ĐIỂM DANH', `Lớp: ${report.className}`, `Tháng: ${report.month}/${report.year}`],
+      [],
+      ['Học sinh', ...report.lessonDates.map((d: string) => {
+        const date = new Date(d);
+        return `${date.getDate()}/${date.getMonth() + 1}`;
+      }), 'Có mặt', 'Nghỉ', 'Học phí']
+    ];
+
+    report.students.forEach((s: any) => {
+      const row = [s.studentName];
+      s.lessons.forEach((l: any) => {
+        row.push(l.present === true ? 'x' : l.present === false ? 'vắng' : '');
+      });
+      row.push(s.attended.toString());
+      row.push(s.absent.toString());
+      row.push(s.amount.toString());
+      wsData.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo');
+    XLSX.writeFile(wb, `BaoCao_${report.className}_T${report.month}_${report.year}.xlsx`);
   };
 
   const isFutureDate = (day: number) => {
@@ -447,6 +476,7 @@ export default function SchedulePage() {
                 </table>
               </div>
               <div className="modal-actions" style={{ marginTop: 14 }}>
+                <button className="btn btn-primary" onClick={exportExcel} style={{ marginRight: 'auto' }}>Xuất Excel</button>
                 <button className="btn btn-secondary" onClick={() => setReport(null)}>Đóng</button>
               </div>
             </div>

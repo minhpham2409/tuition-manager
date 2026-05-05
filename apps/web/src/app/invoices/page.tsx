@@ -98,9 +98,10 @@ export default function InvoicesPage() {
 
         <div className="card">
           {invoices.length > 0 ? (
-            <table className="data-table">
-              <thead><tr><th>Học sinh</th><th>Lớp</th><th>Số tiền</th><th>Buổi học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-              <tbody>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead><tr><th>Học sinh</th><th>Lớp</th><th>Số tiền</th><th>Buổi học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                <tbody>
                 {invoices.map(inv => (
                   <tr key={inv.id}>
                     <td style={{ color: 'var(--text)', fontWeight: 600 }}>{inv.student.name}</td>
@@ -124,6 +125,7 @@ export default function InvoicesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <div className="empty-state">
               <div className="empty-state-text">Chưa có hóa đơn tháng {month}/{year}</div>

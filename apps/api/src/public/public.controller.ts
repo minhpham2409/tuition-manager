@@ -43,4 +43,36 @@ export class PublicController {
       description,
     };
   }
+
+  @Get('portal/:id')
+  async getPublicPortal(@Param('id') id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { id },
+      include: {
+        class: { include: { user: { select: { name: true, email: true } } } },
+        invoices: { orderBy: [{ year: 'desc' }, { month: 'desc' }] },
+        attendances: {
+          include: { lesson: true },
+          orderBy: { lesson: { date: 'desc' } },
+        },
+      },
+    });
+
+    if (!student) throw new NotFoundException('Học sinh không tồn tại');
+
+    return {
+      id: student.id,
+      name: student.name,
+      parentName: student.parentName,
+      className: student.class.name,
+      teacherName: student.class.user.name,
+      invoices: student.invoices,
+      attendances: student.attendances.map(a => ({
+        date: a.lesson.date,
+        present: a.present,
+        note: a.note,
+        taught: a.lesson.taught,
+      })),
+    };
+  }
 }

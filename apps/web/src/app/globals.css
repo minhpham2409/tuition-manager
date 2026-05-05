@@ -124,6 +124,29 @@ input, select, textarea { font-family: var(--font); }
 }
 .sidebar-logout:hover { color: var(--danger); }
 
+/* Mobile Bottom Tab Bar */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%; height: auto; top: auto; bottom: 0;
+    flex-direction: row; border-right: none; border-top: 1px solid var(--border);
+    padding: 6px 10px; z-index: 1000;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+  }
+  .sidebar-brand, .sidebar-footer { display: none; }
+  .sidebar-nav {
+    flex-direction: row; padding: 0; gap: 4px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+  .sidebar-link {
+    flex-direction: column; gap: 4px; padding: 6px 12px;
+    font-size: .65rem; text-align: center; justify-content: center;
+    border-radius: var(--radius-sm); white-space: nowrap;
+  }
+  .sidebar-link .nav-icon { display: none; }
+  .main-content { padding-bottom: 80px; }
+}
+
 /* ── Page Header ──────────────────────────────── */
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -193,11 +216,14 @@ input, select, textarea { font-family: var(--font); }
 .data-table th:last-child { border-radius: 0 var(--radius) 0 0; }
 .data-table td {
   padding: 12px 14px; border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-2); vertical-align: middle;
+  color: var(--text-2); vertical-align: middle; white-space: nowrap;
 }
 .data-table tbody tr { transition: background 0.1s ease; }
 .data-table tbody tr:hover { background: var(--accent-muted); }
 .data-table tbody tr:last-child td { border-bottom: none; }
+
+/* Responsive tables */
+.table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* ── Money display ────────────────────────────── */
 .money { font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--text); }
