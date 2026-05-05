@@ -145,4 +145,59 @@ export class LessonsService {
 
     return { created, total: cls.students.length, totalLessons, pricePerLesson };
   }
+
+  // Get attendance report for a class/month (for parents)
+  async getReport(classId: string, month: number, year: number) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const cls = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: { students: { orderBy: { name: 'asc' } } },
+    });
+    if (!cls) return { error: 'Class not found' };
+
+    const lessons = await this.prisma.lesson.findMany({
+      where: { classId, date: { gte: startDate, lte: endDate }, taught: true },
+      include: { attendances: true },
+      orderBy: { date: 'asc' },
+    });
+
+    const report = cls.students.map(student => {
+      const lessonDetails = lessons.map(lesson => {
+        const att = lesson.attendances.find(a => a.studentId === student.id);
+        return {
+          date: lesson.date,
+          present: att ? att.present : null,
+          note: att?.note || null,
+        };
+      });
+      const attended = lessonDetails.filter(l => l.present === true).length;
+      const absent = lessonDetails.filter(l => l.present === false).length;
+      const total = lessons.length;
+      const amount = cls.pricePerLesson ? cls.pricePerLesson * attended : cls.tuitionFee;
+
+      return {
+        studentId: student.id,
+        studentName: student.name,
+        parentName: student.parentName,
+        parentPhone: student.parentPhone,
+        total,
+        attended,
+        absent,
+        amount,
+        lessons: lessonDetails,
+      };
+    });
+
+    return {
+      className: cls.name,
+      month,
+      year,
+      pricePerLesson: cls.pricePerLesson,
+      totalLessons: lessons.length,
+      lessonDates: lessons.map(l => l.date),
+      students: report,
+    };
+  }
 }

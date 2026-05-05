@@ -7,6 +7,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class LessonsController {
   constructor(private svc: LessonsService) {}
 
+  @Get('report')
+  getReport(@Query('classId') classId: string, @Query('month') month: string, @Query('year') year: string) {
+    return this.svc.getReport(classId, parseInt(month), parseInt(year));
+  }
+
   @Get()
   findByMonth(@Query('classId') classId: string, @Query('month') month: string, @Query('year') year: string) {
     return this.svc.findByMonth(classId, parseInt(month), parseInt(year));
