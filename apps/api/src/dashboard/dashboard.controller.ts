@@ -1,4 +1,5 @@
-import { Controller, Get, Query, Res, UseGuards, Request, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res, UseGuards, Request, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Response } from 'express';
@@ -28,22 +29,14 @@ export class DashboardController {
     );
   }
 
+  // ─── Quarterly tax report ───────────────────────────────────────────────
   @Get('tax-report')
-  getTaxReport(
-    @Query('quarter') quarter: string,
-    @Query('year') year: string,
-    @Request() req,
-  ) {
+  getTaxReport(@Query('quarter') quarter: string, @Query('year') year: string, @Request() req) {
     return this.svc.getTaxReport(req.user.userId, parseInt(quarter) || 1, parseInt(year) || new Date().getFullYear());
   }
 
   @Get('tax-report/export')
-  async exportTaxReport(
-    @Query('quarter') quarter: string,
-    @Query('year') year: string,
-    @Request() req,
-    @Res() res: Response,
-  ) {
+  async exportTaxReport(@Query('quarter') quarter: string, @Query('year') year: string, @Request() req, @Res() res: Response) {
     const q = parseInt(quarter) || 1;
     const y = parseInt(year) || new Date().getFullYear();
     const report = await this.svc.getTaxReport(req.user.userId, q, y);
@@ -51,6 +44,37 @@ export class DashboardController {
     const buffer = await this.svc.exportTaxReportExcel(req.user.userId, q, y);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="bao-cao-thue-Q${q}-${y}.xlsx"`);
+    res.send(buffer);
+  }
+
+  // ─── Monthly tax report ─────────────────────────────────────────────────
+  @Get('tax-report/monthly')
+  getMonthlyTaxReport(@Query('month') month: string, @Query('year') year: string, @Request() req) {
+    return this.svc.getMonthlyTaxReport(
+      req.user.userId,
+      parseInt(month) || new Date().getMonth() + 1,
+      parseInt(year) || new Date().getFullYear(),
+    );
+  }
+
+  @Get('tax-report/monthly/export')
+  async exportMonthlyTaxReport(@Query('month') month: string, @Query('year') year: string, @Request() req, @Res() res: Response) {
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year) || new Date().getFullYear();
+    const buffer = await this.svc.exportMonthlyTaxReportExcel(req.user.userId, m, y);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="ke-khai-thue-T${m}-${y}.xlsx"`);
+    res.send(buffer);
+  }
+
+  // ─── Template (blank Excel for manual input) ────────────────────────────
+  @Get('tax-report/template')
+  async downloadTemplate(@Query('month') month: string, @Query('year') year: string, @Request() req, @Res() res: Response) {
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year) || new Date().getFullYear();
+    const buffer = await this.svc.generateTaxTemplate(req.user.userId, m, y);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="mau-ke-khai-thue-T${m}-${y}.xlsx"`);
     res.send(buffer);
   }
 }
