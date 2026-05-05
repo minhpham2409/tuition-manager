@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ClassesService } from './classes.service';
 import { CreateClassDto, UpdateClassDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -32,4 +33,11 @@ export class ClassesController {
   remove(@Param('id') id: string, @Request() req) {
     return this.svc.remove(id, req.user.userId);
   }
+
+  @Post('import-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  importExcel(@UploadedFile() file: Express.Multer.File, @Request() req) {
+    return this.svc.importFromExcel(file.buffer, req.user.userId);
+  }
 }
+

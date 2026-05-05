@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class LessonsService {
@@ -155,7 +156,6 @@ export class LessonsService {
     return { created, total: cls.students.length, totalLessons, pricePerLesson };
   }
 
-  // Get attendance report for a class/month (for parents)
   async getReport(classId: string, month: number, year: number) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
@@ -209,4 +209,65 @@ export class LessonsService {
       students: report,
     };
   }
+
+  async exportAttendanceExcel(classId: string, month: number, year: number): Promise<Buffer> {
+    const data = await this.getReport(classId, month, year);
+    if ('error' in data) throw new Error(data.error);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Điểm danh');
+
+    // Title
+    const colCount = 4 + data.lessonDates.length + 1;
+    ws.mergeCells(1, 1, 1, colCount);
+    const t1 = ws.getCell('A1');
+    t1.value = `DANH SÁCH HỌC SINH LỚP ${data.className?.toUpperCase()}`;
+    t1.font = { bold: true, size: 13 };
+    t1.alignment = { horizontal: 'center' };
+
+    ws.mergeCells(2, 1, 2, colCount);
+    const t2 = ws.getCell('A2');
+    t2.value = `HỌC THÊM THÁNG ${month}/${year}`;
+    t2.alignment = { horizontal: 'center' };
+
+    // Headers
+    const dateHeaders = data.lessonDates.map((d: Date) => {
+      const dt = new Date(d);
+      return `${dt.getDate()}/${dt.getMonth() + 1}/${dt.getFullYear()}`;
+    });
+    const headerRow = ws.addRow(['STT', 'Họ và tên', 'Lớp trường', '', ...dateHeaders, 'Số tiền']);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    data.students.forEach((s: any, i: number) => {
+      const attendance = s.lessons.map((l: any) => l.present === false ? 'x' : (l.present === true ? 'x' : ''));
+      const rowData = [i + 1, s.studentName, '', '', ...attendance, s.amount];
+      const r = ws.addRow(rowData);
+      r.eachCell((cell, col) => {
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        if (col === colCount) {
+          cell.numFmt = '#,##0';
+          cell.font = { color: { argb: 'FFFF0000' }, bold: true };
+        }
+        if (col > 4 && col < colCount) cell.alignment = { horizontal: 'center' };
+      });
+    });
+
+    // Total row
+    const totalRow = ws.addRow([`Tổng ${data.lessonDates.length} buổi`, '', '', '', ...data.lessonDates.map(() => ''), data.students.reduce((s: number, st: any) => s + st.amount, 0)]);
+    totalRow.eachCell((cell, col) => {
+      cell.font = { bold: true };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      if (col === colCount) cell.numFmt = '#,##0';
+    });
+
+    ws.getColumn(2).width = 22;
+    ws.getColumn(1).width = 6;
+
+    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+  }
 }
+

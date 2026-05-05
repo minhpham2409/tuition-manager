@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request, Res } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Response } from 'express';
 
 @UseGuards(JwtAuthGuard)
 @Controller('lessons')
@@ -46,4 +47,18 @@ export class LessonsController {
   generateInvoices(@Body() body: { classId: string; month: number; year: number }) {
     return this.svc.generateInvoices(body.classId, body.month, body.year);
   }
+
+  @Get('export-attendance')
+  async exportAttendance(
+    @Query('classId') classId: string,
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.svc.exportAttendanceExcel(classId, parseInt(month), parseInt(year));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="diem-danh-T${month}-${year}.xlsx"`);
+    res.send(buffer);
+  }
 }
+

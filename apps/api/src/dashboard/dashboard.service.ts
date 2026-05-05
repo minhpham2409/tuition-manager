@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class DashboardService {
@@ -157,4 +158,93 @@ export class DashboardService {
       timeline: events,
     };
   }
+
+  async getTaxReport(userId: string, quarter: number, year: number) {
+    const months = [((quarter - 1) * 3) + 1, ((quarter - 1) * 3) + 2, ((quarter - 1) * 3) + 3];
+    const classes = await this.prisma.class.findMany({ where: { userId } });
+
+    const rows = [];
+    const monthTotals = [0, 0, 0];
+    let grandTotal = 0;
+
+    for (const cls of classes) {
+      const monthAmounts = [];
+      let rowTotal = 0;
+      for (let i = 0; i < 3; i++) {
+        const m = months[i];
+        const invs = await this.prisma.invoice.findMany({
+          where: { month: m, year, status: 'PAID', student: { classId: cls.id } },
+        });
+        const amount = invs.reduce((s, inv) => s + inv.amount, 0);
+        monthAmounts.push(amount);
+        monthTotals[i] += amount;
+        rowTotal += amount;
+      }
+      grandTotal += rowTotal;
+      rows.push({ className: cls.name, months: monthAmounts, total: rowTotal });
+    }
+
+    const now = new Date();
+    const isMonthComplete = (m: number) => {
+      const lastDay = new Date(year, m, 0);
+      return now > lastDay;
+    };
+
+    return {
+      quarter, year,
+      months,
+      rows,
+      monthTotals,
+      grandTotal,
+      canExport: months.every(m => isMonthComplete(m)),
+      isPreview: !months.every(m => isMonthComplete(m)),
+    };
+  }
+
+  async exportTaxReportExcel(userId: string, quarter: number, year: number): Promise<Buffer> {
+    const report = await this.getTaxReport(userId, quarter, year);
+    const userName = (await this.prisma.user.findFirst({ where: { id: userId } }))?.name || '';
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Báo cáo thuế');
+
+    // Title
+    ws.mergeCells('A1:G1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = `BÁO CÁO THUẾ QUÝ ${quarter} NĂM ${year} - HỘ KINH DOANH ${userName.toUpperCase()}`;
+    titleCell.font = { bold: true, size: 13 };
+    titleCell.alignment = { horizontal: 'center' };
+    ws.addRow([]);
+
+    // Headers
+    const headerRow = ws.addRow(['STT', 'Lớp', `Tháng ${report.months[0]}`, `Tháng ${report.months[1]}`, `Tháng ${report.months[2]}`, 'Tổng']);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+
+    report.rows.forEach((row, i) => {
+      const r = ws.addRow([i + 1, row.className, row.months[0], row.months[1], row.months[2], row.total]);
+      r.eachCell((cell, colNumber) => {
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        if (colNumber > 2) cell.numFmt = '#,##0';
+      });
+    });
+
+    // Total row
+    const totalRow = ws.addRow(['', 'Tổng', report.monthTotals[0], report.monthTotals[1], report.monthTotals[2], report.grandTotal]);
+    totalRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      if (colNumber > 2) cell.numFmt = '#,##0';
+    });
+
+    ws.getColumn(2).width = 20;
+    [3, 4, 5, 6].forEach(c => { ws.getColumn(c).width = 15; });
+
+    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+  }
 }
+

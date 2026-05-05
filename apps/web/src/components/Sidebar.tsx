@@ -4,13 +4,14 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
 const NAV = [
-  { href: '/', label: 'Tổng quan' },
-  { href: '/classes', label: 'Lớp học' },
-  { href: '/schedule', label: 'Lịch dạy' },
-  { href: '/students', label: 'Học sinh' },
-  { href: '/invoices', label: 'Học phí' },
-  { href: '/history', label: 'Lịch sử' },
-  { href: '/settings', label: 'Cài đặt' },
+  { href: '/', label: '📊 Tổng quan' },
+  { href: '/classes', label: '🏫 Lớp học' },
+  { href: '/schedule', label: '📅 Lịch dạy' },
+  { href: '/students', label: '👨‍🎓 Học sinh' },
+  { href: '/invoices', label: '💰 Học phí' },
+  { href: '/history', label: '📜 Lịch sử' },
+  { href: '/tax-report', label: '🧾 Báo cáo thuế' },
+  { href: '/settings', label: '⚙️ Cài đặt' },
 ];
 
 export default function Sidebar() {

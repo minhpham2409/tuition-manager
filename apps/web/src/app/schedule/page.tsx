@@ -6,6 +6,7 @@ import { api, formatMoney } from '@/lib/api';
 import * as XLSX from 'xlsx';
 import Sidebar from '@/components/Sidebar';
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 export default function SchedulePageWrapper() {
@@ -262,6 +263,20 @@ function SchedulePage() {
         <div className="page-header">
           <h1 className="page-title">Lịch dạy <span>{currentClass?.name || ''}</span></h1>
           <div style={{ display: 'flex', gap: 8 }}>
+            {taughtCount > 0 && (
+              <button className="btn btn-ghost" onClick={async () => {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API}/lessons/export-attendance?classId=${classId}&month=${month}&year=${year}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) return alert('Không xuất được');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `diem-danh-T${month}-${year}-${currentClass?.name}.xlsx`; a.click();
+                URL.revokeObjectURL(url);
+              }}>⬇️ Điểm danh</button>
+            )}
             {taughtCount > 0 && <button className="btn btn-secondary" onClick={openReport}>Báo cáo</button>}
             <button className="btn btn-primary" onClick={generateLessons}>Tạo từ lịch</button>
           </div>

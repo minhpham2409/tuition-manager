@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { api, formatMoney } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 const WEEKDAYS = ['', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
 
 export default function ClassesPage() {
@@ -14,6 +15,32 @@ export default function ClassesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: '', pricePerLesson: '', schedule: '', scheduleTime: '' });
+  const [toast, setToast] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const importExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/classes/import-excel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showToast(`✅ Đã import lớp "${data.className}" — ${data.studentsImported} học sinh mới`);
+      load();
+    } catch (e: any) {
+      alert('Lỗi import: ' + e.message);
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
 
   useEffect(() => { if (!al && !user) router.push('/login'); }, [user, al]);
   const load = () => api.get('/classes').then(setClasses).catch(console.error);
@@ -44,7 +71,11 @@ export default function ClassesPage() {
       <main className="main-content">
         <div className="page-header">
           <h1 className="page-title">Quản lý <span>Lớp học</span></h1>
-          <button className="btn btn-primary" onClick={openNew}>Thêm lớp</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={importExcel} />
+            <button className="btn btn-secondary" onClick={() => fileRef.current?.click()}>📥 Import Excel</button>
+            <button className="btn btn-primary" onClick={openNew}>Thêm lớp</button>
+          </div>
         </div>
         {classes.length > 0 ? (
           <div className="class-grid">
