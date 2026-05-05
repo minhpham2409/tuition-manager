@@ -96,27 +96,35 @@ export default function SchedulePage() {
   };
 
   const copyReportForParent = (student: any) => {
-    const dates = student.lessons
-      .filter((l: any) => l.present === true)
-      .map((l: any) => new Date(l.date).toLocaleDateString('vi-VN'))
-      .join(', ');
-    const absentDates = student.lessons
-      .filter((l: any) => l.present === false)
-      .map((l: any) => new Date(l.date).toLocaleDateString('vi-VN') + (l.note ? ` (${l.note})` : ''))
-      .join(', ');
+    // Build lesson-by-lesson detail
+    const lessonLines = student.lessons.map((l: any, i: number) => {
+      const d = new Date(l.date);
+      const dayName = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()];
+      const dateStr = d.toLocaleDateString('vi-VN');
+      const status = l.present === true ? '✓ Có mặt' : l.present === false ? `✗ Nghỉ${l.note ? ' (' + l.note + ')' : ''}` : '— Chưa có';
+      return `  ${i + 1}. ${dayName} ${dateStr} — ${status}`;
+    }).join('\n');
+
     const msg = [
       `Kính gửi PH ${student.parentName},`,
       ``,
-      `Báo cáo điểm danh T${month}/${year} — ${report.className}`,
+      `BÁO CÁO ĐIỂM DANH THÁNG ${month}/${year}`,
+      `Lớp: ${report.className}`,
       `Học sinh: ${student.studentName}`,
+      `Giá: ${formatMoney(report.pricePerLesson)}/buổi`,
       ``,
-      `Tổng buổi: ${student.total}`,
-      `Có mặt: ${student.attended} buổi`,
-      student.absent > 0 ? `Vắng: ${student.absent} buổi (${absentDates})` : '',
+      `CHI TIẾT TỪNG BUỔI:`,
+      lessonLines,
       ``,
-      `Học phí: ${student.attended} buổi × ${formatMoney(report.pricePerLesson)} = ${formatMoney(student.amount)}`,
+      `TỔNG KẾT:`,
+      `  Tổng buổi: ${student.total}`,
+      `  Có mặt: ${student.attended} buổi`,
+      student.absent > 0 ? `  Vắng: ${student.absent} buổi` : '',
       ``,
-      `Trân trọng.`,
+      `HỌC PHÍ:`,
+      `  ${student.attended} buổi × ${formatMoney(report.pricePerLesson)} = ${formatMoney(student.amount)}`,
+      ``,
+      `Xin cảm ơn PH đã theo dõi!`,
     ].filter(Boolean).join('\n');
     navigator.clipboard.writeText(msg);
     showToast(`Đã copy báo cáo ${student.studentName}`);

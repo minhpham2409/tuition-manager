@@ -37,7 +37,10 @@ export default function InvoicesPage() {
   const sendZalo = (inv: any) => {
     const phone = inv.student.parentPhone;
     const payUrl = `${window.location.origin}/pay/${inv.id}`;
-    const msg = `Chào phụ huynh ${inv.student.parentName},\n\nNhắc đóng học phí tháng ${month}/${year} cho bé ${inv.student.name}.\nSố tiền: ${formatMoney(inv.amount)}\nLink thanh toán: ${payUrl}\n\nXin cảm ơn!`;
+    const lessonInfo = inv.lessonsAttended != null
+      ? `\nSố buổi học: ${inv.lessonsAttended}/${inv.lessonsTotal} buổi${inv.note && inv.note.startsWith('Nghỉ') ? `\n${inv.note}` : ''}`
+      : '';
+    const msg = `Kính gửi PH ${inv.student.parentName},\n\nNHẮC ĐÓNG HỌC PHÍ THÁNG ${month}/${year}\nLớp: ${inv.student.class?.name}\nHọc sinh: ${inv.student.name}${lessonInfo}\n\nSố tiền: ${formatMoney(inv.amount)}\nLink thanh toán: ${payUrl}\n\nXin cảm ơn!`;
     navigator.clipboard.writeText(msg).then(() => showToast('Đã copy tin nhắn'));
     if (phone) {
       const zaloPhone = phone.replace(/^0/, '84');
