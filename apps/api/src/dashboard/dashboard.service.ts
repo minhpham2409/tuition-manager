@@ -11,6 +11,7 @@ export class DashboardService {
 
     const invoices = await this.prisma.invoice.findMany({
       where: { month, year, student: { class: { userId } } },
+      include: { student: { include: { class: { select: { name: true, pricePerLesson: true } } } } },
     });
 
     const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -28,9 +29,7 @@ export class DashboardService {
         where: { month: m, year: y, status: 'PAID', student: { class: { userId } } },
       });
       revenueByMonth.push({
-        month: m,
-        year: y,
-        label: `T${m}/${y}`,
+        month: m, year: y, label: `T${m}/${y}`,
         revenue: monthInvoices.reduce((sum, inv) => sum + inv.amount, 0),
       });
     }
@@ -39,19 +38,48 @@ export class DashboardService {
     const unpaidStudents = await this.prisma.invoice.findMany({
       where: { month, year, status: 'UNPAID', student: { class: { userId } } },
       include: { student: { include: { class: { select: { name: true } } } } },
-      take: 10,
+      take: 20,
+    });
+
+    // Per-class breakdown
+    const classBreakdown = [];
+    const userClasses = await this.prisma.class.findMany({
+      where: { userId },
+      include: { _count: { select: { students: true } } },
+    });
+    for (const cls of userClasses) {
+      const clsInvoices = invoices.filter(inv => inv.student.class.name === cls.name);
+      const clsPaid = clsInvoices.filter(i => i.status === 'PAID');
+      classBreakdown.push({
+        name: cls.name,
+        studentCount: cls._count.students,
+        pricePerLesson: cls.pricePerLesson,
+        totalInvoices: clsInvoices.length,
+        paidCount: clsPaid.length,
+        unpaidCount: clsInvoices.length - clsPaid.length,
+        totalAmount: clsInvoices.reduce((s, i) => s + i.amount, 0),
+        paidAmount: clsPaid.reduce((s, i) => s + i.amount, 0),
+      });
+    }
+
+    // Lessons this month
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+    const totalLessons = await this.prisma.lesson.count({
+      where: { class: { userId }, date: { gte: startDate, lte: endDate } },
+    });
+    const taughtLessons = await this.prisma.lesson.count({
+      where: { class: { userId }, date: { gte: startDate, lte: endDate }, taught: true },
     });
 
     return {
-      classes,
-      students,
-      totalAmount,
-      paidAmount,
+      classes, students, totalAmount, paidAmount,
       unpaidAmount: totalAmount - paidAmount,
-      paidCount,
-      unpaidCount,
-      revenueByMonth,
-      unpaidStudents,
+      paidCount, unpaidCount,
+      revenueByMonth, unpaidStudents,
+      classBreakdown,
+      totalLessons, taughtLessons,
+      collectionRate: invoices.length > 0 ? Math.round((paidCount / invoices.length) * 100) : 0,
     };
   }
 
@@ -86,8 +114,7 @@ export class DashboardService {
     events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
-      month,
-      year,
+      month, year,
       summary: { total, paidCount: paid.length, unpaidCount: unpaid.length, totalAmount, paidAmount, unpaidAmount: totalAmount - paidAmount },
       invoices: invoices.map(inv => ({
         id: inv.id,
@@ -99,12 +126,8 @@ export class DashboardService {
         paidAt: inv.paidAt,
         note: inv.note,
         transactions: inv.transactions.map(tx => ({
-          id: tx.id,
-          amount: tx.amount,
-          content: tx.content,
-          gateway: tx.gateway,
-          matched: tx.matched,
-          date: tx.transactionDate,
+          id: tx.id, amount: tx.amount, content: tx.content,
+          gateway: tx.gateway, matched: tx.matched, date: tx.transactionDate,
         })),
       })),
       timeline: events,
