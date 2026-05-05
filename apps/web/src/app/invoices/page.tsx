@@ -123,7 +123,7 @@ function InvoicesPage() {
                     <td className="money">{formatMoney(inv.amount)}</td>
                     <td style={{ fontSize: '.82rem', color: 'var(--text-3)' }}>
                       {inv.lessonsAttended != null ? `${inv.lessonsAttended}/${inv.lessonsTotal} buổi` : '—'}
-                      {inv.note && inv.note.startsWith('Nghỉ') && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>· {inv.note}</span>}
+                      {inv.note && <span style={{ color: inv.note.includes('Bổ sung') ? 'var(--accent)' : inv.note.includes('Nghỉ') ? 'var(--danger)' : 'var(--text-3)', marginLeft: 4 }}>· {inv.note}</span>}
                     </td>
                     <td>
                       <span className={`badge badge-${inv.status === 'PAID' ? 'paid' : 'unpaid'}`}>

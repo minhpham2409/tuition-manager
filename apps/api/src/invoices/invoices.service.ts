@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateInvoicesDto, UpdateInvoiceDto } from './dto';
 import { InvoiceStatus } from '@prisma/client';
@@ -18,7 +18,7 @@ export class InvoicesService {
       include: {
         student: { include: { class: { select: { name: true } } } },
       },
-      orderBy: [{ status: 'asc' }, { student: { name: 'asc' } }],
+      orderBy: [{ status: 'asc' }, { student: { name: 'asc' } }, { createdAt: 'asc' }],
     });
   }
 
@@ -31,6 +31,12 @@ export class InvoicesService {
 
     let created = 0;
     for (const student of cls.students) {
+      // Check if student already has an invoice for this month
+      const existing = await this.prisma.invoice.findFirst({
+        where: { studentId: student.id, month: dto.month, year: dto.year },
+      });
+      if (existing) continue; // skip, already exists
+
       try {
         await this.prisma.invoice.create({
           data: {
@@ -42,13 +48,21 @@ export class InvoicesService {
         });
         created++;
       } catch (e) {
-        // unique constraint violation = invoice already exists, skip
+        // skip errors
       }
     }
     return { created, total: cls.students.length };
   }
 
   async update(id: string, dto: UpdateInvoiceDto) {
+    const existing = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!existing) throw new ForbiddenException('Hóa đơn không tồn tại');
+
+    // Once PAID, cannot be changed back
+    if (existing.status === 'PAID' && dto.status && dto.status !== 'PAID') {
+      throw new ForbiddenException('Hóa đơn đã đóng không thể thay đổi trạng thái');
+    }
+
     const data: any = { ...dto };
     if (dto.status === 'PAID') data.paidAt = new Date();
     if (dto.status === 'UNPAID') data.paidAt = null;
@@ -77,7 +91,9 @@ export class InvoicesService {
       accountName: bank.accountName,
       amount: invoice.amount,
       description,
+      transferContent: description,
       studentName: invoice.student.name,
+      className: '',
       month: invoice.month,
       year: invoice.year,
     };

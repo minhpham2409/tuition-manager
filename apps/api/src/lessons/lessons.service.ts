@@ -85,6 +85,9 @@ export class LessonsService {
     return results;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GENERATE INVOICES — the core billing logic
+  // ═══════════════════════════════════════════════════════════════════════════
   async generateInvoices(classId: string, month: number, year: number) {
     const cls = await this.prisma.class.findUnique({
       where: { id: classId },
@@ -92,42 +95,185 @@ export class LessonsService {
     });
     if (!cls) return { error: 'Class not found' };
 
-    const pricePerLesson = cls.pricePerLesson || cls.tuitionFee;
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     const taughtLessons = await this.prisma.lesson.findMany({
       where: { classId, date: { gte: startDate, lte: endDate }, taught: true },
       include: { attendances: true },
+      orderBy: { date: 'asc' },
     });
 
     const totalLessons = taughtLessons.length;
     if (totalLessons === 0) return { error: 'Chưa có buổi dạy nào được đánh dấu trong tháng này' };
 
-    let created = 0;
+    let created = 0, updated = 0, skippedPaid = 0, supplementary = 0;
+    const details: any[] = [];
+
     for (const student of cls.students) {
+      // ── 1. Filter lessons by student join date ──
+      const joinDate = new Date(student.createdAt);
+      joinDate.setHours(0, 0, 0, 0);
+
+      const eligibleLessons = taughtLessons.filter(lesson => {
+        const ld = new Date(lesson.date);
+        ld.setHours(0, 0, 0, 0);
+        return ld >= joinDate;
+      });
+
+      // ── 2. Count actual attendance ──
+      let lessonsAttended = 0;
       let absences = 0;
-      for (const lesson of taughtLessons) {
+      const eligibleLessonIds: string[] = [];
+
+      for (const lesson of eligibleLessons) {
+        eligibleLessonIds.push(lesson.id);
         const att = lesson.attendances.find(a => a.studentId === student.id);
-        if (att && !att.present) absences++;
+        if (!att || att.present) {
+          // No record = present (teacher didn't mark absent)
+          lessonsAttended++;
+        } else {
+          absences++;
+        }
       }
-      const lessonsAttended = totalLessons - absences;
-      const amount = cls.pricePerLesson ? cls.pricePerLesson * lessonsAttended : cls.tuitionFee;
-      try {
-        await this.prisma.invoice.upsert({
-          where: { studentId_month_year: { studentId: student.id, month, year } },
-          create: { studentId: student.id, month, year, amount, lessonsTotal: totalLessons, lessonsAttended, note: absences > 0 ? `Nghỉ ${absences} buổi` : undefined },
-          update: { amount, lessonsTotal: totalLessons, lessonsAttended, note: absences > 0 ? `Nghỉ ${absences} buổi` : undefined },
+
+      const eligibleTotal = eligibleLessons.length;
+      const amount = cls.pricePerLesson
+        ? cls.pricePerLesson * lessonsAttended
+        : cls.tuitionFee;
+
+      // Build note
+      const noteParts: string[] = [];
+      if (eligibleTotal < totalLessons) {
+        noteParts.push(`Vào lớp từ ${joinDate.getDate()}/${month}`);
+      }
+      if (absences > 0) noteParts.push(`Nghỉ ${absences} buổi`);
+      const note = noteParts.join(', ') || undefined;
+
+      // ── 3. Handle existing invoices ──
+      const existingInvoices = await this.prisma.invoice.findMany({
+        where: { studentId: student.id, month, year },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      // Collect all lesson IDs already billed in existing PAID invoices
+      const alreadyBilledLessonIds = new Set<string>();
+      let hasUnpaidInvoice = false;
+      let unpaidInvoiceId: string | null = null;
+
+      for (const inv of existingInvoices) {
+        if (inv.status === 'PAID') {
+          // Parse the lessonsCounted field to know which lessons were already paid for
+          if (inv.lessonsCounted) {
+            try {
+              const ids = JSON.parse(inv.lessonsCounted) as string[];
+              ids.forEach(id => alreadyBilledLessonIds.add(id));
+            } catch {}
+          }
+        } else {
+          // There's an existing unpaid invoice
+          hasUnpaidInvoice = true;
+          unpaidInvoiceId = inv.id;
+        }
+      }
+
+      if (alreadyBilledLessonIds.size === 0 && existingInvoices.length === 0) {
+        // ── Case A: No invoices exist → create new ──
+        await this.prisma.invoice.create({
+          data: {
+            studentId: student.id, month, year, amount,
+            lessonsTotal: totalLessons, lessonsAttended,
+            lessonsCounted: JSON.stringify(eligibleLessonIds),
+            note,
+          },
         });
         created++;
-      } catch (e) {}
+        details.push({ student: student.name, action: 'tạo mới', lessons: `${lessonsAttended}/${eligibleTotal}`, amount });
+
+      } else if (alreadyBilledLessonIds.size > 0) {
+        // ── Case B: Student has PAID invoices ──
+        // Find NEW lessons not yet billed
+        const newLessonIds = eligibleLessonIds.filter(id => !alreadyBilledLessonIds.has(id));
+        if (newLessonIds.length === 0) {
+          skippedPaid++;
+          details.push({ student: student.name, action: 'đã đóng đủ', lessons: `${alreadyBilledLessonIds.size} buổi đã thanh toán`, amount: 0 });
+        } else {
+          // Count attendance for only the NEW lessons
+          let newAttended = 0;
+          for (const lid of newLessonIds) {
+            const lesson = taughtLessons.find(l => l.id === lid);
+            if (!lesson) continue;
+            const att = lesson.attendances.find(a => a.studentId === student.id);
+            if (!att || att.present) newAttended++;
+          }
+          const suppAmount = cls.pricePerLesson
+            ? cls.pricePerLesson * newAttended
+            : 0; // flat fee already paid
+
+          if (suppAmount > 0) {
+            // Update existing unpaid or create supplementary
+            if (hasUnpaidInvoice && unpaidInvoiceId) {
+              await this.prisma.invoice.update({
+                where: { id: unpaidInvoiceId },
+                data: {
+                  amount: suppAmount,
+                  lessonsTotal: newLessonIds.length,
+                  lessonsAttended: newAttended,
+                  lessonsCounted: JSON.stringify(newLessonIds),
+                  note: `Bổ sung ${newLessonIds.length} buổi mới`,
+                },
+              });
+              updated++;
+              details.push({ student: student.name, action: 'cập nhật bổ sung', lessons: `+${newAttended} buổi mới`, amount: suppAmount });
+            } else {
+              await this.prisma.invoice.create({
+                data: {
+                  studentId: student.id, month, year,
+                  amount: suppAmount,
+                  lessonsTotal: newLessonIds.length,
+                  lessonsAttended: newAttended,
+                  lessonsCounted: JSON.stringify(newLessonIds),
+                  note: `Bổ sung ${newLessonIds.length} buổi mới`,
+                },
+              });
+              supplementary++;
+              details.push({ student: student.name, action: 'tạo HĐ bổ sung', lessons: `+${newAttended} buổi mới`, amount: suppAmount });
+            }
+          } else {
+            skippedPaid++;
+            details.push({ student: student.name, action: 'không phát sinh thêm', lessons: '0 buổi mới', amount: 0 });
+          }
+        }
+
+      } else if (hasUnpaidInvoice && unpaidInvoiceId) {
+        // ── Case C: Existing UNPAID invoice → update it ──
+        await this.prisma.invoice.update({
+          where: { id: unpaidInvoiceId },
+          data: {
+            amount, lessonsTotal: totalLessons, lessonsAttended,
+            lessonsCounted: JSON.stringify(eligibleLessonIds),
+            note,
+          },
+        });
+        updated++;
+        details.push({ student: student.name, action: 'cập nhật', lessons: `${lessonsAttended}/${eligibleTotal}`, amount });
+      }
     }
-    return { created, total: cls.students.length, totalLessons, pricePerLesson };
+
+    return {
+      created, updated, supplementary, skippedPaid,
+      total: cls.students.length,
+      totalLessons,
+      pricePerLesson: cls.pricePerLesson || cls.tuitionFee,
+      details,
+    };
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT — attendance report for a class/month
+  // ═══════════════════════════════════════════════════════════════════════════
   async getReport(classId: string, month: number, year: number) {
     const startDate = new Date(year, month - 1, 1);
-    // Use current date as end if month not over yet
     const now = new Date();
     const lastDayOfMonth = new Date(year, month, 0, 23, 59, 59);
     const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
@@ -145,20 +291,61 @@ export class LessonsService {
     });
 
     const students = cls.students.map(student => {
+      const joinDate = new Date(student.createdAt);
+      joinDate.setHours(0, 0, 0, 0);
+
       const lessonDetails = lessons.map(lesson => {
+        const lessonDate = new Date(lesson.date);
+        lessonDate.setHours(0, 0, 0, 0);
+        const isEligible = lessonDate >= joinDate;
+
+        if (!isEligible) {
+          // Student hadn't joined yet — mark as N/A
+          return { date: lesson.date, present: null, note: 'Chưa vào lớp', eligible: false };
+        }
+
         const att = lesson.attendances.find(a => a.studentId === student.id);
-        return { date: lesson.date, present: att ? att.present : true, note: att?.note || null };
+        return {
+          date: lesson.date,
+          present: att ? att.present : true, // no record = present
+          note: att?.note || null,
+          eligible: true,
+        };
       });
-      const attended = lessonDetails.filter(l => l.present === true).length;
-      const absent = lessonDetails.filter(l => l.present === false).length;
-      const total = lessons.length;
+
+      const eligibleLessons = lessonDetails.filter(l => l.eligible);
+      const attended = eligibleLessons.filter(l => l.present === true).length;
+      const absent = eligibleLessons.filter(l => l.present === false).length;
+      const total = eligibleLessons.length;
       const amount = cls.pricePerLesson ? cls.pricePerLesson * attended : cls.tuitionFee;
-      return { studentId: student.id, studentName: student.name, parentName: student.parentName, parentPhone: student.parentPhone, total, attended, absent, amount, lessons: lessonDetails };
+
+      return {
+        studentId: student.id,
+        studentName: student.name,
+        parentName: student.parentName,
+        parentPhone: student.parentPhone,
+        joinedAt: student.createdAt,
+        total,           // eligible lessons only
+        totalAll: lessons.length, // all lessons in month
+        attended,
+        absent,
+        amount,
+        lessons: lessonDetails,
+      };
     });
 
-    return { className: cls.name, month, year, pricePerLesson: cls.pricePerLesson, totalLessons: lessons.length, lessonDates: lessons.map(l => l.date), students };
+    return {
+      className: cls.name, month, year,
+      pricePerLesson: cls.pricePerLesson,
+      totalLessons: lessons.length,
+      lessonDates: lessons.map(l => l.date),
+      students,
+    };
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EXPORT — Excel attendance sheet
+  // ═══════════════════════════════════════════════════════════════════════════
   async exportAttendanceExcel(classId: string, month: number, year: number): Promise<Buffer> {
     const data = await this.getReport(classId, month, year);
 
@@ -166,7 +353,6 @@ export class LessonsService {
     const ws = wb.addWorksheet('Điểm danh');
 
     const lessonCount = data.lessonDates.length;
-    // Columns: STT | Họ tên | Lớp trường | [date1..dateN] | Số tiền
     const colCount = 3 + lessonCount + 1;
 
     ws.mergeCells(1, 1, 1, colCount);
@@ -194,7 +380,10 @@ export class LessonsService {
     });
 
     data.students.forEach((s: any, i: number) => {
-      const attendance = s.lessons.map((l: any) => l.present !== false ? 'x' : '0');
+      const attendance = s.lessons.map((l: any) => {
+        if (!l.eligible) return '—'; // wasn't in class yet
+        return l.present !== false ? 'x' : '0';
+      });
       const rowData = [i + 1, s.studentName, '', ...attendance, s.amount];
       const r = ws.addRow(rowData);
       r.eachCell((cell, col) => {
@@ -223,7 +412,7 @@ export class LessonsService {
     return wb.xlsx.writeBuffer() as Promise<Buffer>;
   }
 
-  // Generate a blank attendance template for a class (for import)
+  // Generate a blank attendance template for a class
   async generateAttendanceTemplate(classId: string, month: number, year: number): Promise<Buffer> {
     const cls = await this.prisma.class.findUnique({
       where: { id: classId },
@@ -234,10 +423,7 @@ export class LessonsService {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Điểm danh');
 
-    // How many lesson slots to show (based on schedule or default 4)
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const lessonSlots = 5; // blank columns for teacher to fill
-
+    const lessonSlots = 5;
     const colCount = 3 + lessonSlots + 1;
 
     ws.mergeCells(1, 1, 1, colCount);

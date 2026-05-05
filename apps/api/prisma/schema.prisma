@@ -78,22 +78,23 @@ model Student {
 }
 
 model Invoice {
-  id           String        @id @default(uuid())
-  studentId    String
-  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  month        Int
-  year         Int
-  amount       Int
-  lessonsTotal Int?          // Tổng buổi dạy trong tháng
-  lessonsAttended Int?       // Số buổi HS tham gia
-  status       InvoiceStatus @default(UNPAID)
-  note         String?
-  paidAt       DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  transactions Transaction[]
+  id              String        @id @default(uuid())
+  studentId       String
+  student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  month           Int
+  year            Int
+  amount          Int
+  lessonsTotal    Int?          // Tổng buổi dạy trong tháng
+  lessonsAttended Int?          // Số buổi HS tham gia
+  lessonsCounted  String?       // IDs of lessons counted in this invoice (JSON array)
+  status          InvoiceStatus @default(UNPAID)
+  note            String?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transactions    Transaction[]
 
-  @@unique([studentId, month, year])
+  @@index([studentId, month, year])
 }
 
 model Transaction {

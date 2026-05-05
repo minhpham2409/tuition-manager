@@ -142,8 +142,13 @@ function SchedulePage() {
   const generateInvoices = async () => {
     const res = await api.post('/lessons/generate-invoices', { classId, month, year });
     if (res.error) return showToast(res.error);
-    showToast(`Tạo ${res.created} hóa đơn thành công`);
-    setTimeout(() => router.push(`/invoices?month=${month}&year=${year}`), 1500);
+    const parts: string[] = [];
+    if (res.created > 0) parts.push(`${res.created} mới`);
+    if (res.updated > 0) parts.push(`${res.updated} cập nhật`);
+    if (res.supplementary > 0) parts.push(`${res.supplementary} bổ sung`);
+    if (res.skippedPaid > 0) parts.push(`${res.skippedPaid} đã đóng`);
+    showToast(`Hóa đơn: ${parts.join(' · ')}`);
+    setTimeout(() => router.push(`/invoices?month=${month}&year=${year}`), 2000);
   };
 
   const openReport = async () => {
