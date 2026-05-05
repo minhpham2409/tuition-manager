@@ -409,7 +409,7 @@ export class LessonsService {
     ws.getColumn(3).width = 10;
     for (let c = 4; c <= colCount; c++) ws.getColumn(c).width = 10;
 
-    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 
   // Generate a blank attendance template for a class
@@ -465,6 +465,6 @@ export class LessonsService {
     ws.getColumn(3).width = 10;
     for (let c = 4; c <= colCount; c++) ws.getColumn(c).width = 10;
 
-    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 }

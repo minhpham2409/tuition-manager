@@ -244,7 +244,7 @@ export class DashboardService {
     ws.getColumn(2).width = 20;
     [3, 4, 5, 6].forEach(c => { ws.getColumn(c).width = 15; });
 
-    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 
   // ─── Monthly tax report ─────────────────────────────────────────────────
@@ -351,6 +351,6 @@ export class DashboardService {
     ws.getColumn(3).width = 20;
     ws.getColumn(4).width = 30;
 
-    return wb.xlsx.writeBuffer() as Promise<Buffer>;
+    return wb.xlsx.writeBuffer() as unknown as Promise<Buffer>;
   }
 }

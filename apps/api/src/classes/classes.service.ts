@@ -42,7 +42,7 @@ export class ClassesService {
 
   async importFromExcel(buffer: Buffer, userId: string) {
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
+    await wb.xlsx.load(buffer as any);
     const ws = wb.worksheets[0];
     if (!ws) throw new Error('File Excel không hợp lệ');
 
@@ -91,7 +91,7 @@ export class ClassesService {
     for (const s of students) {
       const exists = await this.prisma.student.findFirst({ where: { name: s.name, classId: cls.id } });
       if (!exists) {
-        await this.prisma.student.create({ data: { name: s.name, classId: cls.id } });
+        await this.prisma.student.create({ data: { name: s.name, parentName: s.name, classId: cls.id } });
         created++;
       }
     }
