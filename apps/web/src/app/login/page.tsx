@@ -19,23 +19,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1 className="auth-title">📖 Học Phí Pro</h1>
-        <p className="auth-subtitle">Đăng nhập để quản lý học phí</p>
-        {error && <div className="auth-error">{error}</div>}
+    <div className="login-page">
+      <div className="login-card">
+        <h1 className="login-title">Học Phí Pro</h1>
+        <p className="login-subtitle">Đăng nhập để quản lý học phí</p>
+        {error && <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: '.82rem', fontWeight: 500, marginBottom: 16 }}>{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group"><label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="me@demo.com" required />
+            <input className="form-input" style={{ width: '100%' }} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="me@demo.com" required />
           </div>
           <div className="form-group"><label className="form-label">Mật khẩu</label>
-            <input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" required />
+            <input className="form-input" style={{ width: '100%' }} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" required />
           </div>
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập →'}
+          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '11px 18px' }} disabled={loading}>
+            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
-        <p className="auth-link">Chưa có tài khoản? <a href="/register">Đăng ký ngay</a></p>
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: '.82rem', color: 'var(--text-3)' }}>Chưa có tài khoản? <a href="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>Đăng ký</a></p>
       </div>
     </div>
   );

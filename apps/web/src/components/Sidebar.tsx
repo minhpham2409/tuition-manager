@@ -1,49 +1,48 @@
 'use client';
-import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
 const NAV = [
-  { href: '/', icon: '📊', label: 'Tổng quan' },
-  { href: '/classes', icon: '📚', label: 'Lớp học' },
-  { href: '/schedule', icon: '📅', label: 'Lịch dạy' },
-  { href: '/students', icon: '🎓', label: 'Học sinh' },
-  { href: '/invoices', icon: '💳', label: 'Học phí' },
-  { href: '/history', icon: '📋', label: 'Lịch sử' },
-  { href: '/settings', icon: '⚙️', label: 'Cài đặt' },
+  { href: '/', label: 'Tổng quan' },
+  { href: '/classes', label: 'Lớp học' },
+  { href: '/schedule', label: 'Lịch dạy' },
+  { href: '/students', label: 'Học sinh' },
+  { href: '/invoices', label: 'Học phí' },
+  { href: '/history', label: 'Lịch sử' },
+  { href: '/settings', label: 'Cài đặt' },
 ];
 
-export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
+export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, logout } = useAuth();
 
-  const navigate = (href: string) => { router.push(href); onClose?.(); };
-
   return (
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
-      <div className="sidebar-header">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">📖</div>
-          Học Phí Pro
-        </div>
-        <div className="sidebar-subtitle">Quản lý thu phí thông minh</div>
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <h1>Học Phí Pro</h1>
+        <p>Quản lý thu phí thông minh</p>
       </div>
       <nav className="sidebar-nav">
         {NAV.map(n => (
-          <button key={n.href} className={`nav-item ${pathname === n.href ? 'active' : ''}`} onClick={() => navigate(n.href)}>
-            <span className="nav-icon">{n.icon}</span>{n.label}
-          </button>
+          <Link
+            key={n.href}
+            href={n.href}
+            className={`sidebar-link ${pathname === n.href ? 'active' : ''}`}
+          >
+            {n.label}
+          </Link>
         ))}
       </nav>
       <div className="sidebar-footer">
-        <div className="user-info">
-          <div className="user-avatar">{user?.name?.[0] || '?'}</div>
-          <div>
-            <div className="user-name">{user?.name}</div>
-            <div className="user-email">{user?.email}</div>
+        <div className="sidebar-user">
+          <div className="sidebar-avatar">{user?.name?.[0] || 'U'}</div>
+          <div className="sidebar-user-info">
+            <div className="name">{user?.name}</div>
+            <div className="email">{user?.email}</div>
           </div>
         </div>
-        <button className="btn-logout" onClick={() => { logout(); router.push('/login'); }}>↪ Đăng xuất</button>
+        <button className="sidebar-logout" onClick={logout}>Đăng xuất</button>
       </div>
     </aside>
   );
