@@ -37,7 +37,7 @@ export default function SettingsPage() {
   if (al || !user) return <div className="loading"><div className="spinner" /></div>;
 
   const previewUrl = form.accountNo
-    ? `https://img.vietqr.io/image/${form.bankId}-${form.accountNo}-compact2.png?amount=500000&addInfo=HP%20T${new Date().getMonth() + 1}%20Demo&accountName=${encodeURIComponent(form.accountName)}`
+    ? `https://qr.sepay.vn/img?acc=${form.accountNo}&bank=${form.bankId}&amount=500000&des=HPDEMO12`
     : '';
 
   return (

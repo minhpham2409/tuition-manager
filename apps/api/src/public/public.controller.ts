@@ -25,7 +25,7 @@ export class PublicController {
     const numericId = invoice.id.replace(/[^0-9]/g, '').substring(0, 8).padEnd(8, '0');
     const paymentCode = `HP${numericId}`;
     const qrUrl = bank
-      ? `https://img.vietqr.io/image/${bank.bankId}-${bank.accountNo}-compact2.png?amount=${invoice.amount}&addInfo=${paymentCode}&accountName=${encodeURIComponent(bank.accountName)}`
+      ? `https://qr.sepay.vn/img?acc=${bank.accountNo}&bank=${bank.bankId}&amount=${invoice.amount}&des=${paymentCode}`
       : null;
 
     return {
