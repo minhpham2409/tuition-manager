@@ -69,11 +69,20 @@ export class LessonsService {
 
   // Update lesson (mark taught, add note)
   async update(id: string, data: { taught?: boolean; note?: string }) {
+    const lesson = await this.prisma.lesson.findUnique({ where: { id } });
+    if (!lesson) return { error: 'Lesson not found' };
+    // Once taught, cannot be reverted
+    if (lesson.taught && data.taught === false) {
+      return { error: 'Buổi đã xác nhận dạy không thể hoàn tác' };
+    }
     return this.prisma.lesson.update({ where: { id }, data });
   }
 
-  // Delete lesson
+  // Delete lesson (only if not taught)
   async remove(id: string) {
+    const lesson = await this.prisma.lesson.findUnique({ where: { id } });
+    if (!lesson) return { error: 'Lesson not found' };
+    if (lesson.taught) return { error: 'Không thể xóa buổi đã xác nhận dạy' };
     return this.prisma.lesson.delete({ where: { id } });
   }
 

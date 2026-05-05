@@ -22,6 +22,7 @@ export default function SchedulePage() {
   const [confirmLesson, setConfirmLesson] = useState<any>(null);
   const [attendanceData, setAttendanceData] = useState<Record<string, { present: boolean; note: string }>>({});
   const [report, setReport] = useState<any>(null);
+  const [sendResult, setSendResult] = useState<any>(null); // Post-confirm send popup
   const [toast, setToast] = useState('');
 
   useEffect(() => { if (!al && !user) router.push('/login'); }, [user, al]);
@@ -60,11 +61,61 @@ export default function SchedulePage() {
     }));
     await api.post(`/lessons/${confirmLesson.id}/attendance`, { records });
     await api.patch(`/lessons/${confirmLesson.id}`, { taught: true });
-    const absent = records.filter(r => !r.present).length;
-    const present = records.filter(r => r.present).length;
-    showToast(`Xác nhận: ${present} có mặt, ${absent} nghỉ`);
+    const lessonDate = new Date(confirmLesson.date);
+    // Build send result for post-confirm popup
+    const studentResults = data?.students?.map((s: any) => {
+      const att = attendanceData[s.id] || { present: true, note: '' };
+      return { ...s, present: att.present, note: att.note };
+    }) || [];
+    setSendResult({ date: lessonDate, students: studentResults });
     setConfirmLesson(null);
     load();
+  };
+
+  const sendLessonZalo = (student: any, lessonDate: Date) => {
+    const dayName = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][lessonDate.getDay()];
+    const dateStr = lessonDate.toLocaleDateString('vi-VN');
+    const status = student.present ? 'CÓ MẶT' : `NGHỈ${student.note ? ' (' + student.note + ')' : ''}`;
+    const msg = [
+      `Kính gửi PH ${student.parentName},`,
+      ``,
+      `THÔNG BÁO BUỔI HỌC`,
+      `Lớp: ${currentClass?.name}`,
+      `Học sinh: ${student.name}`,
+      `Ngày: ${dayName} ${dateStr}`,
+      ``,
+      `Trạng thái: ${status}`,
+      student.present ? '' : `Lý do: ${student.note || 'Không rõ'}`,
+      ``,
+      `Giá buổi: ${formatMoney(currentClass?.pricePerLesson || 0)}`,
+      ``,
+      `Trân trọng.`,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(msg);
+    showToast(`Đã copy thông báo ${student.name}`);
+    if (student.parentPhone) {
+      const zaloPhone = student.parentPhone.replace(/^0/, '84');
+      window.open(`https://zalo.me/${zaloPhone}`, '_blank');
+    }
+  };
+
+  const sendAllZalo = () => {
+    if (!sendResult) return;
+    const dayName = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][sendResult.date.getDay()];
+    const dateStr = sendResult.date.toLocaleDateString('vi-VN');
+    const present = sendResult.students.filter((s: any) => s.present);
+    const absent = sendResult.students.filter((s: any) => !s.present);
+    const msg = [
+      `THÔNG BÁO BUỔI HỌC — ${dayName} ${dateStr}`,
+      `Lớp: ${currentClass?.name}`,
+      ``,
+      `Có mặt (${present.length}):`,
+      ...present.map((s: any) => `  ✓ ${s.name}`),
+      absent.length > 0 ? `\nVắng mặt (${absent.length}):` : '',
+      ...absent.map((s: any) => `  ✗ ${s.name}${s.note ? ' — ' + s.note : ''}`),
+    ].filter(Boolean).join('\n');
+    navigator.clipboard.writeText(msg);
+    showToast('Đã copy thông báo cả lớp');
   };
 
   const deleteLesson = async (id: string, taught: boolean) => {
@@ -397,6 +448,53 @@ export default function SchedulePage() {
               </div>
               <div className="modal-actions" style={{ marginTop: 14 }}>
                 <button className="btn btn-secondary" onClick={() => setReport(null)}>Đóng</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* POST-CONFIRM SEND POPUP */}
+        {sendResult && (
+          <div className="modal-overlay" onClick={() => setSendResult(null)}>
+            <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-title">
+                Xác nhận thành công — {sendResult.date.toLocaleDateString('vi-VN')}
+                <button className="modal-close" onClick={() => setSendResult(null)}>×</button>
+              </div>
+              <div style={{ background: 'var(--success-bg)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: '.82rem', color: 'var(--success)', fontWeight: 600 }}>
+                Buổi dạy đã được khóa. Gửi thông báo cho phụ huynh?
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <div style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--success-bg)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--success)' }}>{sendResult.students.filter((s: any) => s.present).length}</div>
+                  <div style={{ fontSize: '.7rem', color: 'var(--success)' }}>Có mặt</div>
+                </div>
+                <div style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--danger-bg)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)' }}>{sendResult.students.filter((s: any) => !s.present).length}</div>
+                  <div style={{ fontSize: '.7rem', color: 'var(--danger)' }}>Vắng mặt</div>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: 280, overflow: 'auto' }}>
+                {sendResult.students.map((s: any) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.75rem', fontWeight: 700, color: '#fff', background: s.present ? 'var(--success)' : 'var(--danger)', flexShrink: 0 }}>
+                      {s.present ? '✓' : '✗'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.85rem' }}>{s.name}</div>
+                      {!s.present && s.note && <div style={{ fontSize: '.72rem', color: 'var(--danger)' }}>{s.note}</div>}
+                    </div>
+                    <button className="btn btn-sm btn-ghost" onClick={() => sendLessonZalo(s, sendResult.date)}>
+                      Gửi Zalo
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="modal-actions" style={{ marginTop: 14 }}>
+                <button className="btn btn-secondary" onClick={sendAllZalo}>Copy tất cả</button>
+                <button className="btn btn-primary" onClick={() => setSendResult(null)}>Xong</button>
               </div>
             </div>
           </div>
