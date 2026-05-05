@@ -14,14 +14,22 @@ export class ClassesController {
     return this.svc.findAll(req.user.userId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string, @Request() req) {
-    return this.svc.findOne(id, req.user.userId);
+  // Static named routes BEFORE :id
+  @Post('import-excel')
+  @UseInterceptors(FileInterceptor('file'))
+  importExcel(@UploadedFile() file: Express.Multer.File, @Request() req) {
+    return this.svc.importFromExcel(file.buffer, req.user.userId);
   }
 
   @Post()
   create(@Body() dto: CreateClassDto, @Request() req) {
     return this.svc.create(dto, req.user.userId);
+  }
+
+  // Parameterized routes LAST
+  @Get(':id')
+  findOne(@Param('id') id: string, @Request() req) {
+    return this.svc.findOne(id, req.user.userId);
   }
 
   @Patch(':id')
@@ -33,11 +41,4 @@ export class ClassesController {
   remove(@Param('id') id: string, @Request() req) {
     return this.svc.remove(id, req.user.userId);
   }
-
-  @Post('import-excel')
-  @UseInterceptors(FileInterceptor('file'))
-  importExcel(@UploadedFile() file: Express.Multer.File, @Request() req) {
-    return this.svc.importFromExcel(file.buffer, req.user.userId);
-  }
 }
-
