@@ -20,6 +20,7 @@ export default function SchedulePage() {
   const [classId, setClassId] = useState(classIdParam);
   const [data, setData] = useState<any>(null);
   const [selectedLesson, setSelectedLesson] = useState<any>(null);
+  const [confirmLesson, setConfirmLesson] = useState<any>(null); // For taught confirmation popup
   const [lessonNote, setLessonNote] = useState('');
   const [attendanceData, setAttendanceData] = useState<Record<string, { present: boolean; note: string }>>({});
   const [toast, setToast] = useState('');
@@ -42,18 +43,46 @@ export default function SchedulePage() {
     load();
   };
 
-  const toggleTaught = async (lesson: any) => {
-    await api.patch(`/lessons/${lesson.id}`, { taught: !lesson.taught });
+  // When clicking "Đã dạy": open attendance popup first
+  const handleMarkTaught = (lesson: any) => {
+    if (lesson.taught) {
+      // If already taught, just untoggle
+      api.patch(`/lessons/${lesson.id}`, { taught: false }).then(() => load());
+      return;
+    }
+    // Open attendance confirmation popup
+    setConfirmLesson(lesson);
+    const aData: Record<string, { present: boolean; note: string }> = {};
+    data?.students?.forEach((s: any) => { aData[s.id] = { present: true, note: '' }; });
+    lesson.attendances?.forEach((a: any) => {
+      aData[a.student.id] = { present: a.present, note: a.note || '' };
+    });
+    setAttendanceData(aData);
+  };
+
+  // Confirm taught + save attendance
+  const confirmTaught = async () => {
+    const records = Object.entries(attendanceData).map(([studentId, val]) => ({
+      studentId, present: val.present, note: val.note || undefined,
+    }));
+    await api.post(`/lessons/${confirmLesson.id}/attendance`, { records });
+    await api.patch(`/lessons/${confirmLesson.id}`, { taught: true });
+    const absent = records.filter(r => !r.present).length;
+    const present = records.filter(r => r.present).length;
+    showToast(`Xác nhận: ${present} có mặt, ${absent} nghỉ`);
+    setConfirmLesson(null);
     load();
   };
 
-  const deleteLesson = async (id: string) => {
-    if (!confirm('Xóa buổi dạy này?')) return;
+  const deleteLesson = async (id: string, taught: boolean) => {
+    if (taught) {
+      if (!confirm('Buổi này đã đánh dấu "Đã dạy". Vẫn muốn xóa?')) return;
+    }
     await api.delete(`/lessons/${id}`);
+    showToast('Đã xóa buổi dạy');
     load();
   };
 
-  // Click empty cell to add lesson on that date
   const addLessonOnDate = async (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     try {
@@ -79,7 +108,6 @@ export default function SchedulePage() {
       studentId, present: val.present, note: val.note || undefined,
     }));
     await api.post(`/lessons/${selectedLesson.id}/attendance`, { records });
-    // Also save lesson note
     if (lessonNote !== (selectedLesson.note || '')) {
       await api.patch(`/lessons/${selectedLesson.id}`, { note: lessonNote });
     }
@@ -115,6 +143,10 @@ export default function SchedulePage() {
   const totalLessons = data?.lessons?.length || 0;
   const currentClass = classes.find(c => c.id === classId);
 
+  // For confirm popup
+  const confirmPresent = Object.values(attendanceData).filter(a => a.present).length;
+  const confirmAbsent = Object.values(attendanceData).filter(a => !a.present).length;
+
   return (
     <div className="app-layout">
       <Sidebar />
@@ -140,7 +172,6 @@ export default function SchedulePage() {
           </span>
         </div>
 
-        {/* Legend */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 10, paddingLeft: 2 }}>
           {[
             { color: 'var(--success)', label: 'Đã dạy' },
@@ -171,6 +202,8 @@ export default function SchedulePage() {
               return (
                 <div key={i}
                   onClick={() => canAddLesson && addLessonOnDate(day!)}
+                  onMouseEnter={e => { if (canAddLesson) (e.currentTarget.style.background = 'var(--accent-muted)'); }}
+                  onMouseLeave={e => { if (canAddLesson) (e.currentTarget.style.background = 'var(--surface)'); }}
                   style={{
                     padding: 8, minHeight: 82,
                     borderBottom: '1px solid var(--border-subtle)', borderRight: '1px solid var(--border-subtle)',
@@ -178,11 +211,7 @@ export default function SchedulePage() {
                     opacity: future && !lesson ? 0.35 : future ? 0.5 : 1,
                     cursor: canAddLesson ? 'pointer' : 'default',
                     transition: 'background 0.15s ease',
-                    ...(canAddLesson ? { ':hover': { background: 'var(--accent-muted)' } } : {}),
-                  }}
-                  onMouseEnter={e => { if (canAddLesson) (e.currentTarget.style.background = 'var(--accent-muted)'); }}
-                  onMouseLeave={e => { if (canAddLesson) (e.currentTarget.style.background = 'var(--surface)'); }}
-                >
+                  }}>
                   {day && (
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -192,20 +221,19 @@ export default function SchedulePage() {
                           ...(isToday ? { background: 'var(--accent)', borderRadius: '50%', width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } : {}),
                         }}>{day}</span>
                         {lesson && !future && (
-                          <button onClick={e => { e.stopPropagation(); deleteLesson(lesson.id); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: 'var(--text-3)', lineHeight: 1 }}>×</button>
+                          <button onClick={e => { e.stopPropagation(); deleteLesson(lesson.id, lesson.taught); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: 'var(--text-3)', lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
+                            title="Xóa buổi dạy">×</button>
                         )}
                       </div>
                       {lesson ? (
                         <div>
                           {future ? (
-                            <div style={{ padding: '4px 0', borderRadius: 6, fontSize: '.7rem', fontWeight: 600, textAlign: 'center', color: 'var(--text-3)' }}>
-                              Chưa đến
-                            </div>
+                            <div style={{ padding: '4px 0', borderRadius: 6, fontSize: '.7rem', fontWeight: 600, textAlign: 'center', color: 'var(--text-3)' }}>Chưa đến</div>
                           ) : (
                             <>
                               <button
-                                onClick={e => { e.stopPropagation(); toggleTaught(lesson); }}
+                                onClick={e => { e.stopPropagation(); handleMarkTaught(lesson); }}
                                 style={{
                                   display: 'block', width: '100%', padding: '4px 0', border: 'none', borderRadius: 6,
                                   cursor: 'pointer', fontSize: '.72rem', fontWeight: 600, marginBottom: 3,
@@ -214,18 +242,18 @@ export default function SchedulePage() {
                                 }}>
                                 {lesson.taught ? 'Đã dạy' : 'Chưa dạy'}
                               </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); openAttendance(lesson); }}
-                                style={{ display: 'block', width: '100%', padding: '3px 0', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', fontSize: '.68rem', background: 'var(--surface)', color: 'var(--text-2)', transition: 'all 0.15s ease' }}>
-                                Điểm danh{absentCount > 0 && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>· {absentCount} nghỉ</span>}
-                              </button>
+                              {lesson.taught && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); openAttendance(lesson); }}
+                                  style={{ display: 'block', width: '100%', padding: '3px 0', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', fontSize: '.68rem', background: 'var(--surface)', color: 'var(--text-2)', transition: 'all 0.15s ease' }}>
+                                  Điểm danh{absentCount > 0 && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>· {absentCount} nghỉ</span>}
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
                       ) : canAddLesson ? (
-                        <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--accent)', fontSize: '.68rem', fontWeight: 500, opacity: 0.6 }}>
-                          + Thêm buổi
-                        </div>
+                        <div style={{ textAlign: 'center', padding: '8px 0', color: 'var(--accent)', fontSize: '.68rem', fontWeight: 500, opacity: 0.6 }}>+ Thêm buổi</div>
                       ) : null}
                     </div>
                   )}
@@ -240,61 +268,114 @@ export default function SchedulePage() {
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Xuất hóa đơn</div>
               <div style={{ fontSize: '.82rem', color: 'var(--text-3)' }}>
-                {taughtCount} buổi × {formatMoney(currentClass?.pricePerLesson || 0)}/buổi
-                {data?.students?.length > 0 && ` · ${data.students.length} học sinh`}
+                {taughtCount} buổi × {formatMoney(currentClass?.pricePerLesson || 0)}/buổi · {data?.students?.length || 0} học sinh
               </div>
             </div>
             <button className="btn btn-primary" onClick={generateInvoices}>Tạo hóa đơn tháng {month}</button>
           </div>
         )}
 
-        {/* Attendance Modal */}
-        {selectedLesson && (
-          <div className="modal-overlay" onClick={() => setSelectedLesson(null)}>
-            <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+        {/* CONFIRM TAUGHT POPUP — shows when clicking "Chưa dạy" */}
+        {confirmLesson && (
+          <div className="modal-overlay" onClick={() => setConfirmLesson(null)}>
+            <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
               <div className="modal-title">
-                Điểm danh — {new Date(selectedLesson.date).toLocaleDateString('vi-VN')}
-                <button className="modal-close" onClick={() => setSelectedLesson(null)}>×</button>
+                Xác nhận buổi dạy — {new Date(confirmLesson.date).toLocaleDateString('vi-VN')}
+                <button className="modal-close" onClick={() => setConfirmLesson(null)}>×</button>
               </div>
 
-              {/* Lesson note */}
+              <div style={{ background: 'var(--bg-subtle)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 16 }}>
+                <div style={{ fontSize: '.82rem', color: 'var(--text-2)' }}>
+                  Đánh dấu có mặt / nghỉ cho từng học sinh, sau đó bấm xác nhận.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                <div style={{ flex: 1, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--success-bg)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--success)' }}>{confirmPresent}</div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--success)', fontWeight: 600 }}>Có mặt</div>
+                </div>
+                <div style={{ flex: 1, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--danger-bg)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--danger)' }}>{confirmAbsent}</div>
+                  <div style={{ fontSize: '.72rem', color: 'var(--danger)', fontWeight: 600 }}>Vắng mặt</div>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                {data?.students?.map((s: any) => {
+                  const att = attendanceData[s.id] || { present: true, note: '' };
+                  return (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <button
+                        onClick={() => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], present: !att.present } }))}
+                        style={{
+                          width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+                          fontSize: '.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: att.present ? 'var(--success)' : 'var(--danger)', color: '#fff',
+                          transition: 'all 0.15s ease', flexShrink: 0,
+                        }}>
+                        {att.present ? '✓' : '✗'}
+                      </button>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.85rem' }}>{s.name}</div>
+                        {!att.present && (
+                          <input placeholder="Lý do nghỉ..." value={att.note}
+                            onChange={e => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], note: e.target.value } }))}
+                            className="form-input" style={{ marginTop: 4, width: '100%', padding: '4px 8px', fontSize: '.75rem' }} />
+                        )}
+                      </div>
+                      <span style={{ fontSize: '.75rem', color: att.present ? 'var(--success)' : 'var(--danger)', fontWeight: 600, flexShrink: 0 }}>
+                        {att.present ? 'Có mặt' : 'Nghỉ'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setConfirmLesson(null)}>Hủy</button>
+                <button className="btn btn-primary" onClick={confirmTaught}>Xác nhận đã dạy</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT ATTENDANCE MODAL — for already-taught lessons */}
+        {selectedLesson && (
+          <div className="modal-overlay" onClick={() => setSelectedLesson(null)}>
+            <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-title">
+                Sửa điểm danh — {new Date(selectedLesson.date).toLocaleDateString('vi-VN')}
+                <button className="modal-close" onClick={() => setSelectedLesson(null)}>×</button>
+              </div>
               <div className="form-group" style={{ marginBottom: 14 }}>
                 <label className="form-label">Ghi chú buổi dạy</label>
                 <input className="form-input" style={{ width: '100%' }} placeholder="VD: Ôn tập chương 3..."
                   value={lessonNote} onChange={e => setLessonNote(e.target.value)} />
               </div>
-
-              <div style={{ maxHeight: 360, overflow: 'auto' }}>
+              <div style={{ maxHeight: 320, overflow: 'auto' }}>
                 {data?.students?.map((s: any) => {
                   const att = attendanceData[s.id] || { present: true, note: '' };
                   return (
-                    <div key={s.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
-                      borderBottom: '1px solid var(--border-subtle)',
-                    }}>
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' }}>
                       <button
                         onClick={() => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], present: !att.present } }))}
                         style={{
-                          width: 34, height: 34, borderRadius: 8, border: 'none',
-                          cursor: 'pointer', fontSize: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: att.present ? 'var(--success)' : 'var(--danger)',
-                          color: '#fff', transition: 'all 0.15s ease', flexShrink: 0,
+                          width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+                          fontSize: '.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: att.present ? 'var(--success)' : 'var(--danger)', color: '#fff',
+                          transition: 'all 0.15s ease', flexShrink: 0,
                         }}>
                         {att.present ? '✓' : '✗'}
                       </button>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.88rem' }}>{s.name}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.85rem' }}>{s.name}</div>
                         {!att.present && (
-                          <input
-                            placeholder="Lý do nghỉ..."
-                            value={att.note}
+                          <input placeholder="Lý do nghỉ..." value={att.note}
                             onChange={e => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], note: e.target.value } }))}
-                            className="form-input"
-                            style={{ marginTop: 6, width: '100%', padding: '5px 10px', fontSize: '.78rem' }}
-                          />
+                            className="form-input" style={{ marginTop: 4, width: '100%', padding: '4px 8px', fontSize: '.75rem' }} />
                         )}
                       </div>
-                      <span style={{ fontSize: '.78rem', color: att.present ? 'var(--success)' : 'var(--danger)', fontWeight: 600, flexShrink: 0 }}>
+                      <span style={{ fontSize: '.75rem', color: att.present ? 'var(--success)' : 'var(--danger)', fontWeight: 600, flexShrink: 0 }}>
                         {att.present ? 'Có mặt' : 'Nghỉ'}
                       </span>
                     </div>
