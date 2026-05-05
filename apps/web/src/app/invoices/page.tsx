@@ -37,6 +37,16 @@ function InvoicesPage() {
 
   const showQR = async (id: string) => { const data = await api.get(`/invoices/${id}/qr`); if (data.error) return alert(data.error); setQrData(data); };
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+  const markAsPaid = async (id: string) => {
+    if (!confirm('Bạn có chắc muốn cập nhật hóa đơn này thành ĐÃ ĐÓNG? Thao tác này không thể hoàn tác.')) return;
+    try {
+      await api.patch(`/invoices/${id}`, { status: 'PAID' });
+      showToast('Đã cập nhật trạng thái hóa đơn');
+      load();
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
 
   const sendZalo = (inv: any) => {
     const phone = inv.student.parentPhone;
@@ -123,7 +133,12 @@ function InvoicesPage() {
                     </td>
                     <td style={{ display: 'flex', gap: 4 }}>
                       <button className="btn btn-sm btn-ghost" onClick={() => showQR(inv.id)}>QR</button>
-                      {inv.status !== 'PAID' && <button className="btn btn-sm btn-primary" onClick={() => sendZalo(inv)}>Zalo</button>}
+                      {inv.status !== 'PAID' && (
+                        <>
+                          <button className="btn btn-sm btn-ghost" onClick={() => markAsPaid(inv.id)}>Đã thu</button>
+                          <button className="btn btn-sm btn-primary" onClick={() => sendZalo(inv)}>Zalo</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

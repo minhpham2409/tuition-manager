@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
-import { GenerateInvoicesDto } from './dto';
+import { GenerateInvoicesDto, UpdateInvoiceDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -32,6 +32,11 @@ export class InvoicesController {
   @Get(':id/qr')
   getQr(@Param('id') id: string, @Request() req) {
     return this.svc.getQrData(id, req.user.userId);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateInvoiceDto) {
+    return this.svc.update(id, dto);
   }
 }
 
