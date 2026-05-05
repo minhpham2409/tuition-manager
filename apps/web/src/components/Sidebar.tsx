@@ -20,7 +20,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <h1>Học Phí Pro</h1>
+        <h1>PhamMinh Tool</h1>
         <p>Quản lý thu phí thông minh</p>
       </div>
       <nav className="sidebar-nav">

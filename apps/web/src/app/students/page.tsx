@@ -108,7 +108,7 @@ export default function StudentsPage() {
                   <tbody>
                     {filtered.map(s => (
                       <tr key={s.id}>
-                        <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
+                        <td style={{ color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }} onClick={() => router.push(`/students/${s.id}`)}>{s.name}</td>
                         <td>{s.parentName}</td>
                         <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
                         <td>
@@ -155,7 +155,7 @@ export default function StudentsPage() {
                     <tbody>
                       {classStudents.map(s => (
                         <tr key={s.id}>
-                          <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.name}</td>
+                          <td style={{ color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }} onClick={() => router.push(`/students/${s.id}`)}>{s.name}</td>
                           <td>{s.parentName}</td>
                           <td style={{ fontVariantNumeric: 'tabular-nums' }}>{s.parentPhone || '—'}</td>
                           <td style={{ display: 'flex', gap: 4 }}>

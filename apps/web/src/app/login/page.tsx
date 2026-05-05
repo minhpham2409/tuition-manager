@@ -21,7 +21,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">Học Phí Pro</h1>
+        <h1 className="login-title">PhamMinh Tool</h1>
         <p className="login-subtitle">Đăng nhập để quản lý học phí</p>
         {error && <div style={{ padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: '.82rem', fontWeight: 500, marginBottom: 16 }}>{error}</div>}
         <form onSubmit={handleSubmit}>

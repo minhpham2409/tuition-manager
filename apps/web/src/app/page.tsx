@@ -5,6 +5,8 @@ import { useAuth } from '@/lib/auth';
 import { api, formatMoney } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 
+const showToastGlobal = (msg: string, setter: (v: string) => void) => { setter(msg); setTimeout(() => setter(''), 3000); };
+
 export default function DashboardPage() {
   const { user, loading: al } = useAuth();
   const router = useRouter();
@@ -12,6 +14,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [toast, setToast] = useState('');
 
   useEffect(() => { if (!al && !user) router.push('/login'); }, [user, al]);
   useEffect(() => {
@@ -201,6 +204,54 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Overdue Reminders */}
+        {stats?.overdueList?.length > 0 && (
+          <div className="card" style={{ marginTop: 14, border: '1px solid var(--danger)', borderColor: 'rgba(196, 62, 62, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div className="card-title" style={{ marginBottom: 0, color: 'var(--danger)' }}>
+                ⚠️ Nhắc nhở chưa đóng ({stats.overdueList.length})
+              </div>
+              <button className="btn btn-sm btn-danger" onClick={() => {
+                const msg = stats.overdueList.map((inv: any) =>
+                  `• ${inv.studentName} (${inv.className}) — T${inv.month}/${inv.year} — ${formatMoney(inv.amount)} — Quá hạn ${inv.daysOld} ngày`
+                ).join('\n');
+                navigator.clipboard.writeText(`DANH SÁCH QUÁ HẠN CHƯĂ ĐÓNG PHÍ:\n\n${msg}`);
+                showToastGlobal(`Đã copy ${stats.overdueList.length} học sinh quá hạn`, setToast);
+              }}>Copy tất cả</button>
+            </div>
+            <div className="table-responsive">
+              <table className="data-table" style={{ fontSize: '.82rem' }}>
+                <thead><tr><th>Học sinh</th><th>Lớp</th><th>Tháng</th><th>Số tiền</th><th>Quá hạn</th><th>Nhắc</th></tr></thead>
+                <tbody>
+                  {stats.overdueList.map((inv: any) => (
+                    <tr key={inv.id}>
+                      <td style={{ fontWeight: 600, color: 'var(--text)' }}>{inv.studentName}</td>
+                      <td>{inv.className}</td>
+                      <td>T{inv.month}/{inv.year}</td>
+                      <td className="money money-red">{formatMoney(inv.amount)}</td>
+                      <td><span className="badge badge-unpaid">{inv.daysOld} ngày</span></td>
+                      <td>
+                        <button className="btn btn-sm btn-ghost" onClick={() => {
+                          const payUrl = `${window.location.origin}/pay/${inv.id}`;
+                          const msg = `Kính gửi PH ${inv.parentName},\n\nNHẮC ĐÓNG HỌC PHÍ THÁNG ${inv.month}/${inv.year}\nLớp: ${inv.className}\nHọc sinh: ${inv.studentName}\nSố tiền: ${formatMoney(inv.amount)}\nLink thanh toán: ${payUrl}\n\nHóa đơn đã quá hạn ${inv.daysOld} ngày, xin vui lòng thanh toán sớm.\nXin cảm ơn!`;
+                          navigator.clipboard.writeText(msg);
+                          showToastGlobal(`Đã copy nhắc ${inv.studentName}`, setToast);
+                          if (inv.parentPhone) {
+                            const zaloPhone = inv.parentPhone.replace(/^0/, '84');
+                            window.open(`https://zalo.me/${zaloPhone}`, '_blank');
+                          }
+                        }}>Zalo</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {toast && <div className="toast toast-success">{toast}</div>}
       </main>
     </div>
   );

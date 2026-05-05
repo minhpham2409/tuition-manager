@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Public endpoint - no JWT required
@@ -21,9 +21,9 @@ export class PublicController {
       where: { userId: invoice.student.class.userId, isDefault: true },
     });
 
-    const description = `HP T${invoice.month} ${invoice.student.name}`.substring(0, 50);
+    const paymentCode = `HP${invoice.id.substring(0, 8).toUpperCase()}`;
     const qrUrl = bank
-      ? `https://img.vietqr.io/image/${bank.bankId}-${bank.accountNo}-compact2.png?amount=${invoice.amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(bank.accountName)}`
+      ? `https://img.vietqr.io/image/${bank.bankId}-${bank.accountNo}-compact2.png?amount=${invoice.amount}&addInfo=${paymentCode}&accountName=${encodeURIComponent(bank.accountName)}`
       : null;
 
     return {
@@ -40,7 +40,7 @@ export class PublicController {
       paidAt: invoice.paidAt,
       qrUrl,
       bank: bank ? { bankId: bank.bankId, accountNo: bank.accountNo, accountName: bank.accountName } : null,
-      description,
+      description: paymentCode,
     };
   }
 
@@ -74,5 +74,43 @@ export class PublicController {
         taught: a.lesson.taught,
       })),
     };
+  }
+
+  @Post('sepay-webhook')
+  async handleSepayWebhook(@Body() body: any) {
+    // SePay sends data in body.data for transactions, or body directly depending on config
+    const transactions = body.data ? (Array.isArray(body.data) ? body.data : [body.data]) : (Array.isArray(body) ? body : [body]);
+    
+    for (const tx of transactions) {
+      if (tx.transferType !== 'in') continue; // Only care about incoming money
+      
+      const content = (tx.content || '').toUpperCase();
+      
+      // Match HP + 8 chars
+      const match = content.match(/HP[A-Z0-9]{8}/);
+      if (!match) continue;
+
+      const code = match[0];
+      const shortId = code.substring(2).toLowerCase();
+
+      // Find invoice where ID starts with shortId
+      const invoices = await this.prisma.invoice.findMany({
+        where: { id: { startsWith: shortId } }
+      });
+
+      if (invoices.length === 1) {
+        const invoice = invoices[0];
+        
+        // If money received is >= invoice amount, mark as PAID
+        if (tx.transferAmount >= invoice.amount && invoice.status !== 'PAID') {
+          await this.prisma.invoice.update({
+            where: { id: invoice.id },
+            data: { status: 'PAID', paidAt: new Date(tx.transactionDate || new Date()) }
+          });
+        }
+      }
+    }
+    
+    return { success: true };
   }
 }

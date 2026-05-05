@@ -72,6 +72,29 @@ export class DashboardService {
       where: { class: { userId }, date: { gte: startDate, lte: endDate }, taught: true },
     });
 
+    // Overdue reminders: unpaid invoices older than 7 days
+    const overdueInvoices = await this.prisma.invoice.findMany({
+      where: { status: 'UNPAID', student: { class: { userId } } },
+      include: { student: { include: { class: { select: { name: true } } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const now = new Date();
+    const overdueList = overdueInvoices.map(inv => {
+      const daysOld = Math.floor((now.getTime() - new Date(inv.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        id: inv.id,
+        studentName: inv.student.name,
+        parentName: (inv.student as any).parentName,
+        parentPhone: (inv.student as any).parentPhone,
+        className: inv.student.class.name,
+        month: inv.month,
+        year: inv.year,
+        amount: inv.amount,
+        daysOld,
+      };
+    }).filter(inv => inv.daysOld >= 7)
+      .sort((a, b) => b.daysOld - a.daysOld);
+
     return {
       classes, students, totalAmount, paidAmount,
       unpaidAmount: totalAmount - paidAmount,
@@ -80,6 +103,7 @@ export class DashboardService {
       classBreakdown,
       totalLessons, taughtLessons,
       collectionRate: invoices.length > 0 ? Math.round((paidCount / invoices.length) * 100) : 0,
+      overdueList,
     };
   }
 

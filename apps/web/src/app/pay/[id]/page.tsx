@@ -40,7 +40,7 @@ export default function PayPage() {
       <div style={{ background: '#fff', borderRadius: 18, padding: '32px 28px', maxWidth: 420, width: '100%', boxShadow: '0 8px 30px rgba(0,0,0,0.08)', border: '1px solid #E4E4E7' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1A1A1E', marginBottom: 4 }}>📖 Học Phí Pro</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1A1A1E', marginBottom: 4 }}>📖 PhamMinh Tool</div>
           <div style={{ fontSize: '.82rem', color: '#A1A1AA' }}>Thông báo học phí từ {data.teacherName}</div>
         </div>
 

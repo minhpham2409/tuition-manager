@@ -18,6 +18,11 @@ export class StudentsController {
     return this.svc.findOne(id);
   }
 
+  @Get(':id/stats')
+  getStats(@Param('id') id: string) {
+    return this.svc.getStats(id);
+  }
+
   @Post()
   create(@Body() dto: CreateStudentDto) {
     return this.svc.create(dto);

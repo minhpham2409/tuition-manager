@@ -87,8 +87,7 @@ export default function SchedulePage() {
       ``,
       `Trạng thái: ${status}`,
       student.present ? '' : `Lý do: ${student.note || 'Không rõ'}`,
-      ``,
-      `Giá buổi: ${formatMoney(currentClass?.pricePerLesson || 0)}`,
+      student.present && student.note ? `Nhận xét GV: ${student.note}` : '',
       ``,
       `Trân trọng.`,
     ].filter(Boolean).join('\n');
@@ -212,6 +211,21 @@ export default function SchedulePage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo');
     XLSX.writeFile(wb, `BaoCao_${report.className}_T${report.month}_${report.year}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    if (!report) return;
+    const dates = report.lessonDates.map((d: string) => {
+      const date = new Date(d);
+      return `${date.getDate()}/${date.getMonth() + 1}`;
+    });
+    const rows = report.students.map((s: any) => {
+      const cells = s.lessons.map((l: any) => l.present === true ? '✓' : l.present === false ? '✗' : '—');
+      return `<tr><td style="font-weight:600;white-space:nowrap">${s.studentName}</td>${cells.map((c: string) => `<td style="text-align:center;color:${c === '✓' ? '#1a8a5c' : c === '✗' ? '#c43e3e' : '#999'}">${c}</td>`).join('')}<td style="text-align:center;font-weight:700;color:#1a8a5c">${s.attended}</td><td style="text-align:center;font-weight:700;color:${s.absent > 0 ? '#c43e3e' : '#999'}">${s.absent}</td><td style="text-align:right;font-weight:600">${formatMoney(s.amount)}</td></tr>`;
+    }).join('');
+    const html = `<html><head><title>Báo cáo ${report.className}</title><style>body{font-family:Inter,sans-serif;padding:24px;font-size:12px}h1{font-size:16px;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px 8px}th{background:#f5f5f5;font-size:11px}</style></head><body><h1>BÁO CÁO ĐIỂM DANH — ${report.className}</h1><p>Tháng ${report.month}/${report.year} · ${report.totalLessons} buổi · Giá: ${formatMoney(report.pricePerLesson)}/buổi</p><table><thead><tr><th>Học sinh</th>${dates.map((d: string) => `<th>${d}</th>`).join('')}<th>Có mặt</th><th>Nghỉ</th><th>Học phí</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); w.print(); }
   };
 
   const isFutureDate = (day: number) => {
@@ -398,11 +412,9 @@ export default function SchedulePage() {
                       </button>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.85rem' }}>{s.name}</div>
-                        {!att.present && (
-                          <input placeholder="Lý do nghỉ..." value={att.note}
-                            onChange={e => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], note: e.target.value } }))}
-                            className="form-input" style={{ marginTop: 4, width: '100%', padding: '4px 8px', fontSize: '.75rem' }} />
-                        )}
+                        <input placeholder={att.present ? 'Nhận xét (VD: Làm bài tốt)...' : 'Lý do nghỉ...'} value={att.note}
+                          onChange={e => setAttendanceData(prev => ({ ...prev, [s.id]: { ...prev[s.id], note: e.target.value } }))}
+                          className="form-input" style={{ marginTop: 4, width: '100%', padding: '4px 8px', fontSize: '.75rem' }} />
                       </div>
                       <span style={{ fontSize: '.75rem', color: att.present ? 'var(--success)' : 'var(--danger)', fontWeight: 600, flexShrink: 0 }}>
                         {att.present ? 'Có mặt' : 'Nghỉ'}
@@ -476,7 +488,8 @@ export default function SchedulePage() {
                 </table>
               </div>
               <div className="modal-actions" style={{ marginTop: 14 }}>
-                <button className="btn btn-primary" onClick={exportExcel} style={{ marginRight: 'auto' }}>Xuất Excel</button>
+                <button className="btn btn-primary" onClick={exportExcel} style={{ marginRight: 8 }}>Xuất Excel</button>
+                <button className="btn btn-secondary" onClick={exportPDF} style={{ marginRight: 'auto' }}>Xuất PDF</button>
                 <button className="btn btn-secondary" onClick={() => setReport(null)}>Đóng</button>
               </div>
             </div>
@@ -514,7 +527,7 @@ export default function SchedulePage() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '.85rem' }}>{s.name}</div>
-                      {!s.present && s.note && <div style={{ fontSize: '.72rem', color: 'var(--danger)' }}>{s.note}</div>}
+                      {s.note && <div style={{ fontSize: '.72rem', color: s.present ? 'var(--info)' : 'var(--danger)', marginTop: 1 }}>{s.present ? '📝 ' : ''}{s.note}</div>}
                     </div>
                     <button className="btn btn-sm btn-ghost" onClick={() => sendLessonZalo(s, sendResult.date)}>
                       Gửi Zalo
