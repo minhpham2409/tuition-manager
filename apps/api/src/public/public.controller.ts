@@ -21,7 +21,9 @@ export class PublicController {
       where: { userId: invoice.student.class.userId, isDefault: true },
     });
 
-    const paymentCode = `HP${invoice.id.substring(0, 8).toUpperCase()}`;
+    // Generate numeric-only payment code from UUID (SePay requires 'Số nguyên')
+    const numericId = invoice.id.replace(/[^0-9]/g, '').substring(0, 8).padEnd(8, '0');
+    const paymentCode = `HP${numericId}`;
     const qrUrl = bank
       ? `https://img.vietqr.io/image/${bank.bankId}-${bank.accountNo}-compact2.png?amount=${invoice.amount}&addInfo=${paymentCode}&accountName=${encodeURIComponent(bank.accountName)}`
       : null;
@@ -86,23 +88,25 @@ export class PublicController {
       
       const content = (tx.content || '').toUpperCase();
       
-      // Match HP + 8 chars
-      const match = content.match(/HP[A-Z0-9]{8}/);
+      // Match HP + 3-10 digits (matching SePay's payment code format)
+      const match = content.match(/HP(\d{3,10})/);
       if (!match) continue;
 
-      const code = match[0];
-      const shortId = code.substring(2).toLowerCase();
+      const numericId = match[1];
 
-      // Find invoice where ID starts with shortId
-      const invoices = await this.prisma.invoice.findMany({
-        where: { id: { startsWith: shortId } }
+      // Find invoice where numeric portion of ID matches
+      const allInvoices = await this.prisma.invoice.findMany({
+        where: { status: 'UNPAID' }
+      });
+      
+      const invoice = allInvoices.find(inv => {
+        const invNumericId = inv.id.replace(/[^0-9]/g, '').substring(0, 8).padEnd(8, '0');
+        return invNumericId === numericId;
       });
 
-      if (invoices.length === 1) {
-        const invoice = invoices[0];
-        
+      if (invoice) {
         // If money received is >= invoice amount, mark as PAID
-        if (tx.transferAmount >= invoice.amount && invoice.status !== 'PAID') {
+        if (tx.transferAmount >= invoice.amount) {
           await this.prisma.invoice.update({
             where: { id: invoice.id },
             data: { status: 'PAID', paidAt: new Date(tx.transactionDate || new Date()) }
